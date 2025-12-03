@@ -5,7 +5,7 @@ const categorySchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    unique: true,
+    unique:true
   },
   description: {
     type: String,
@@ -26,7 +26,6 @@ const categorySchema = new mongoose.Schema({
 });
 
 
-categorySchema.index({ name: 1 });
 categorySchema.index({ isActive: 1 });
 
 export default mongoose.model('Category', categorySchema);

@@ -10,7 +10,6 @@ import { createUserValidation, loginValidation } from "../middleware/validators.
 
 const router = express.Router();
 
-// Authentication routes
 router.post('/register', createUserValidation, createUser);
 router.post('/login', loginValidation, login);
 router.post('/logout', logout);

@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 
 class TokenHelper {
-  // Generate access token
   static generateAccessToken(payload) {
     try {
       const secret = process.env.ACCESS_TOKEN_SECRET;
