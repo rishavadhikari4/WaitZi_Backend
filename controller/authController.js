@@ -117,19 +117,25 @@ class AuthController {
       }
 
       const tokens = this.generateTokens(user);
-      
+
+      // Set both tokens in httpOnly cookies
       res.cookie('refreshToken', tokens.refreshToken, this.cookieOptions);
+      res.cookie('accessToken', tokens.accessToken, {
+        ...this.cookieOptions,
+        maxAge: 15 * 60 * 1000 // 15 minutes for access token
+      });
 
       const userResponse = this.sanitizeUserResponse(user);
 
       res.status(200).json({
         success: true,
-        message: "Login successful",
+        message: user.mustChangePassword ? "Login successful. You must change your password." : "Login successful",
         data: {
           user: userResponse,
           accessToken: tokens.accessToken,
           refreshToken: tokens.refreshToken,
-          expiresIn: tokens.expiresIn
+          expiresIn: tokens.expiresIn,
+          mustChangePassword: user.mustChangePassword || false
         },
         meta: {
           loginTime: new Date().toISOString(),
@@ -190,7 +196,9 @@ class AuthController {
 
   async logout(req, res) {
     try {
+      // Clear both token cookies
       res.clearCookie('refreshToken');
+      res.clearCookie('accessToken');
 
       res.status(200).json({
         success: true,
@@ -203,23 +211,23 @@ class AuthController {
 
   async verifyToken(req, res) {
     try {
-      const authHeader = req.headers.authorization;
-
-      if (!authHeader) {
-        return res.status(401).json({
-          success: false,
-          message: "Authorization header is missing"
-        });
-      }
-
       let token, decoded;
       try {
-        token = TokenHelper.extractTokenFromHeader(authHeader);
+        // Try to extract token from either Authorization header or cookies
+        token = TokenHelper.extractToken(req);
         decoded = TokenHelper.verifyAccessToken(token);
       } catch (tokenError) {
+        // Debug logging
+        console.log('Token verification failed:', tokenError.message);
         return res.status(401).json({
           success: false,
-          message: tokenError.message
+          message: tokenError.message,
+          debug: {
+            hasAuthHeader: !!req.headers.authorization,
+            hasCookies: !!req.cookies,
+            cookieNames: Object.keys(req.cookies || {}),
+            timestamp: new Date().toISOString()
+          }
         });
       }
 
@@ -270,7 +278,7 @@ class AuthController {
   }
 
   sanitizeUserResponse(user) {
-    const { password, ...userResponse } = user.toObject();
+    const { password, resetPasswordToken, resetPasswordExpires, __v, ...userResponse } = user.toObject();
     return userResponse;
   }
 

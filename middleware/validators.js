@@ -39,10 +39,11 @@ const createUserValidation = [
         .toLowerCase(),
     
     body('number')
-        .isMobilePhone('any', { strictMode: false })
-        .withMessage('Valid phone number is required')
-        .isLength({ min: 10, max: 15 })
-        .withMessage('Phone number must be between 10-15 digits'),
+        .trim()
+        .notEmpty()
+        .withMessage('Phone number is required')
+        .matches(/^(\+977)?9[78]\d{8}$/)
+        .withMessage('Valid Nepali phone number is required (e.g. 98XXXXXXXX or +97798XXXXXXXX)'),
     
     body('address')
         .trim()

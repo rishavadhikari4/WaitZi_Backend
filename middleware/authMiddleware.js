@@ -16,21 +16,21 @@ class AuthMiddleware {
                 });
             }
 
-            const authHeader = req.headers.authorization;
-            if (!authHeader) {
-                return res.status(401).json({ 
-                    success: false,
-                    message: "Access token is required" 
-                });
-            }
-
             let token;
             try {
-                token = TokenHelper.extractTokenFromHeader(authHeader);
+                // Try to extract token from either Authorization header or cookies
+                token = TokenHelper.extractToken(req);
             } catch (extractError) {
+                console.log('Auth middleware - token extraction failed:', extractError.message);
                 return res.status(401).json({ 
                     success: false,
-                    message: extractError.message 
+                    message: extractError.message,
+                    debug: {
+                        hasAuthHeader: !!req.headers.authorization,
+                        hasCookies: !!req.cookies,
+                        cookieNames: Object.keys(req.cookies || {}),
+                        requestPath: req.path
+                    }
                 });
             }
 
@@ -38,6 +38,7 @@ class AuthMiddleware {
             try {
                 decoded = TokenHelper.verifyAccessToken(token);
             } catch (verifyError) {
+                console.log('Auth middleware - token verification failed:', verifyError.message);
                 return res.status(401).json({ 
                     success: false,
                     message: verifyError.message 
@@ -77,6 +78,7 @@ class AuthMiddleware {
                 res.set('X-Token-Warning', 'Token expires soon');
             }
 
+            console.log(`✅ Authentication successful for user: ${user.email}`);
             next();
         } catch (error) {
             console.error("Authentication middleware error:", error.message);
@@ -90,15 +92,17 @@ class AuthMiddleware {
 
     async optionalAuthenticate(req, res, next) {
         try {
-            const authHeader = req.headers.authorization;
+            let token;
             
-            if (!authHeader) {
+            try {
+                // Try to extract token from either Authorization header or cookies
+                token = TokenHelper.extractToken(req);
+            } catch (extractError) {
                 req.user = null;
                 return next();
             }
 
             try {
-                const token = TokenHelper.extractTokenFromHeader(authHeader);
                 const decoded = TokenHelper.verifyAccessToken(token);
                 const user = await User.findById(decoded.userId).populate('role');
                 

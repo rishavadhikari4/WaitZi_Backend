@@ -60,4 +60,7 @@ const roleMiddleware = new RoleMiddleware();
 
 export const authorizeRole = (allowedRoles, options = {}) => roleMiddleware.authorizeRole(allowedRoles, options);
 
+// Export the roleMiddleware as named export for compatibility
+export { roleMiddleware };
+
 export default roleMiddleware;

@@ -136,6 +136,49 @@ class TokenHelper {
     }
   }
 
+  static extractTokenFromCookie(cookies, tokenName = 'accessToken') {
+    try {
+      if (!cookies || typeof cookies !== 'object') {
+        throw new Error('Cookies object is missing or invalid');
+      }
+
+      const token = cookies[tokenName];
+      
+      if (!token) {
+        throw new Error(`${tokenName} cookie is missing`);
+      }
+
+      return token;
+    } catch (error) {
+      throw new Error(`Cookie token extraction failed: ${error.message}`);
+    }
+  }
+
+  static extractToken(req, tokenName = 'accessToken') {
+    // First try Authorization header
+    const authHeader = req?.headers?.authorization;
+    if (authHeader) {
+      try {
+        return this.extractTokenFromHeader(authHeader);
+      } catch (headerError) {
+        // If header extraction fails, try cookies
+      }
+    }
+
+    // Then try cookies
+    const cookies = req?.cookies;
+    if (cookies) {
+      try {
+        return this.extractTokenFromCookie(cookies, tokenName);
+      } catch (cookieError) {
+        // If both fail, throw a comprehensive error
+        throw new Error('Access token not found in Authorization header or cookies');
+      }
+    }
+
+    throw new Error('Access token is required');
+  }
+
 
   static isTokenNearExpiry(token, bufferMinutes = 5) {
     try {

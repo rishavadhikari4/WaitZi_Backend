@@ -78,11 +78,6 @@ class CategoryController {
     }
   }
 
-  /**
-   * Get all categories with pagination and filtering
-   * @param {Object} req - Express request object
-   * @param {Object} res - Express response object
-   */
   async getAllCategories(req, res) {
     try {
       const queryParams = this.parseQueryParameters(req.query);
@@ -124,16 +119,10 @@ class CategoryController {
     }
   }
 
-  /**
-   * Get category by ID
-   * @param {Object} req - Express request object
-   * @param {Object} res - Express response object
-   */
   async getCategoryById(req, res) {
     try {
       const { id } = req.params;
 
-      // Validate ObjectId format
       if (!this.isValidObjectId(id)) {
         return res.status(400).json({
           success: false,
@@ -161,11 +150,6 @@ class CategoryController {
     }
   }
 
-  /**
-   * Update category
-   * @param {Object} req - Express request object
-   * @param {Object} res - Express response object
-   */
   async updateCategory(req, res) {
     try {
       const { id } = req.params;
@@ -196,10 +180,8 @@ class CategoryController {
         }
       }
 
-      // Build update data
       const updateData = this.buildUpdateData({ name, description, isActive });
 
-      // Handle image update
       if (req.file) {
         const imageUpdateResult = await this.handleImageUpdate(req.file.buffer, existingCategory.imageId);
         if (!imageUpdateResult.success) {
@@ -234,11 +216,6 @@ class CategoryController {
     }
   }
 
-  /**
-   * Delete category
-   * @param {Object} req - Express request object
-   * @param {Object} res - Express response object
-   */
   async deleteCategory(req, res) {
     try {
       const { id } = req.params;

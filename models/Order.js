@@ -65,8 +65,20 @@ const orderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Pending', 'InKitchen', 'Cancelled', 'Served', 'Paid'],
+    enum: ['Pending', 'InKitchen', 'Served', 'Cancelled', 'Paid', 'Completed'],
     default: 'Pending',
+  },
+  assignedWaiter: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  orderTimeout: {
+    type: Date,
+    default: () => new Date(Date.now() + 30 * 60 * 1000), // 30 minutes
+  },
+  isTimedOut: {
+    type: Boolean,
+    default: false,
   },
   note: {
     type: String,

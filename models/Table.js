@@ -28,8 +28,7 @@ const tableSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-
-tableSchema.index({ tableNumber: 1 });
+// tableNumber index is automatically created due to unique: true
 tableSchema.index({ status: 1 });
 tableSchema.index({ assignedWaiter: 1 });
 tableSchema.index({ capacity: 1 });

@@ -13,7 +13,6 @@ const paymentSchema = new mongoose.Schema({
   amount: {
     type: Number,
     required: true,
-    min: 0,
   },
   paymentMethod: {
     type: String,
@@ -32,7 +31,6 @@ const paymentSchema = new mongoose.Schema({
   transactionId: {
     type: String,
     trim: true,
-    sparse: true, 
   },
   paymentTime: {
     type: Date,

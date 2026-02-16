@@ -1,14 +1,25 @@
 import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import cookieParser from "cookie-parser";
 import connectDB from "./config/dbConfig.js";
 import routes from "./routes/index.js";
 import { initializeAdminRole } from "./controller/roleController.js";
+import { initializeTimeoutManager, cleanupTimeouts } from "./utils/orderTimeoutManager.js";
+
+dotenv.config();
 
 const app = express();
 
 const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development';
 
+app.use(cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    credentials: true,
+}));
 app.use(express.json());
+app.use(cookieParser());
 
 const PORT = 5000;
 
@@ -21,6 +32,10 @@ const startServer = async () => {
         
         // Initialize essential roles (including admin)
         await initializeAdminRole();
+        
+        // Initialize order timeout manager
+        await initializeTimeoutManager();
+        console.log('⏰ Order timeout manager initialized');
         
         // Setup routes
         app.use('/api', routes);
@@ -58,3 +73,16 @@ const startServer = async () => {
 };
 
 startServer();
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+    console.log('🔄 SIGTERM received, shutting down gracefully...');
+    cleanupTimeouts();
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    console.log('🔄 SIGINT received, shutting down gracefully...');
+    cleanupTimeouts();
+    process.exit(0);
+});

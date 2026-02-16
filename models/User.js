@@ -51,6 +51,20 @@ const userSchema = new mongoose.Schema({
     default: 'Active',
     index: true, // Create index for filtering
   },
+  resetPasswordToken: {
+    type: String
+  },
+  resetPasswordExpires: {
+    type: Date
+  },
+  passwordChangedAt: {
+    type: Date,
+    default: Date.now
+  },
+  mustChangePassword: {
+    type: Boolean,
+    default: false
+  },
 }, {
   timestamps: true,
 });
