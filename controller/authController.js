@@ -6,10 +6,12 @@ import TokenHelper from "../utils/tokenHelper.js";
 class AuthController {
   constructor() {
     this.saltRounds = 12;
+    const isProduction = process.env.NODE_ENV === 'production';
     this.cookieOptions = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000
     };
   }
@@ -159,7 +161,8 @@ class AuthController {
 
   async refreshToken(req, res) {
     try {
-      const { refreshToken } = req.body;
+      // Read refresh token from cookies first, then fall back to body
+      const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
       if (!refreshToken) {
         return res.status(401).json({
@@ -197,6 +200,13 @@ class AuthController {
 
       const tokens = this.generateTokens(user);
 
+      // Set new tokens in httpOnly cookies
+      res.cookie('refreshToken', tokens.refreshToken, this.cookieOptions);
+      res.cookie('accessToken', tokens.accessToken, {
+        ...this.cookieOptions,
+        maxAge: 15 * 60 * 1000
+      });
+
       res.status(200).json({
         success: true,
         message: "Token refreshed successfully",
@@ -214,9 +224,15 @@ class AuthController {
 
   async logout(req, res) {
     try {
-      // Clear both token cookies
-      res.clearCookie('refreshToken');
-      res.clearCookie('accessToken');
+      // Clear both token cookies with matching options
+      const clearOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        path: '/',
+      };
+      res.clearCookie('refreshToken', clearOptions);
+      res.clearCookie('accessToken', clearOptions);
 
       res.status(200).json({
         success: true,

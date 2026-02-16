@@ -17,8 +17,21 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 // Trust proxy for rate limiting and correct IP detection when behind reverse proxy
 app.set('trust proxy', true);
 
+// Support multiple frontend origins (comma-separated in FRONTEND_URL env var)
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+    .split(',')
+    .map(url => url.trim());
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            console.warn(`CORS blocked origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
 }));
 app.use(express.json());
