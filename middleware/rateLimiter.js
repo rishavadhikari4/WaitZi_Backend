@@ -1,9 +1,9 @@
 import rateLimit from 'express-rate-limit';
 
-// General API rate limiter - 100 requests per 15 minutes
+// General API rate limiter - 500 requests per 15 minutes
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 500,
   message: {
     success: false,
     message: 'Too many requests, please try again later.',
@@ -20,10 +20,10 @@ export const generalLimiter = rateLimit({
   }
 });
 
-// Strict rate limiter for authentication endpoints - 5 requests per 15 minutes
+// Strict rate limiter for authentication endpoints - 20 requests per 15 minutes
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,
+  max: 20,
   message: {
     success: false,
     message: 'Too many authentication attempts, please try again later.',
@@ -41,10 +41,10 @@ export const authLimiter = rateLimit({
   }
 });
 
-// Staff creation rate limiter - 10 requests per hour
+// Staff creation rate limiter - 50 requests per hour
 export const staffCreationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10,
+  max: 50,
   message: {
     success: false,
     message: 'Too many staff creation attempts, please try again later.',
@@ -61,10 +61,10 @@ export const staffCreationLimiter = rateLimit({
   }
 });
 
-// Order creation rate limiter - 20 requests per 10 minutes (for QR code customers)
+// Order creation rate limiter - 100 requests per 10 minutes (for QR code customers)
 export const orderCreationLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 20,
+  max: 100,
   message: {
     success: false,
     message: 'Too many order attempts, please try again later.',
@@ -81,10 +81,10 @@ export const orderCreationLimiter = rateLimit({
   }
 });
 
-// Payment processing rate limiter - 30 requests per 15 minutes
+// Payment processing rate limiter - 150 requests per 15 minutes
 export const paymentLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30,
+  max: 150,
   message: {
     success: false,
     message: 'Too many payment attempts, please try again later.',
@@ -101,10 +101,10 @@ export const paymentLimiter = rateLimit({
   }
 });
 
-// QR generation rate limiter - 50 requests per 15 minutes
+// QR generation rate limiter - 200 requests per 15 minutes
 export const qrLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50,
+  max: 200,
   message: {
     success: false,
     message: 'Too many QR code generation requests, please try again later.',
@@ -121,10 +121,10 @@ export const qrLimiter = rateLimit({
   }
 });
 
-// File upload rate limiter - 20 requests per 15 minutes
+// File upload rate limiter - 100 requests per 15 minutes
 export const uploadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,
+  max: 100,
   message: {
     success: false,
     message: 'Too many file upload attempts, please try again later.',
@@ -141,10 +141,10 @@ export const uploadLimiter = rateLimit({
   }
 });
 
-// Dashboard/Analytics rate limiter - 200 requests per 15 minutes
+// Dashboard/Analytics rate limiter - 1000 requests per 15 minutes
 export const analyticsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200,
+  max: 1000,
   message: {
     success: false,
     message: 'Too many analytics requests, please try again later.',

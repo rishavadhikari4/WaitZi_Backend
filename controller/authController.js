@@ -108,6 +108,15 @@ class AuthController {
         });
       }
 
+      // Check if user role exists and is valid
+      if (!user.role) {
+        console.error('User role not found or invalid:', { userId: user._id, email: user.email });
+        return res.status(500).json({
+          success: false,
+          message: "User role configuration error. Please contact support."
+        });
+      }
+
       const isPasswordValid = await this.verifyPassword(password, user.password);
       if (!isPasswordValid) {
         return res.status(401).json({
@@ -177,6 +186,15 @@ class AuthController {
         });
       }
 
+      // Check if user role exists and is valid
+      if (!user.role) {
+        console.error('User role not found during refresh:', { userId: user._id, email: user.email });
+        return res.status(500).json({
+          success: false,
+          message: "User role configuration error. Please contact support."
+        });
+      }
+
       const tokens = this.generateTokens(user);
 
       res.status(200).json({
@@ -239,6 +257,15 @@ class AuthController {
         });
       }
 
+      // Check if user role exists and is valid
+      if (!user.role) {
+        console.error('User role not found during token verification:', { userId: user._id, email: user.email });
+        return res.status(500).json({
+          success: false,
+          message: "User role configuration error. Please contact support."
+        });
+      }
+
       const userResponse = this.sanitizeUserResponse(user);
 
       res.status(200).json({
@@ -265,6 +292,11 @@ class AuthController {
   }
 
   generateTokens(user) {
+    // Validate that user.role exists before accessing its properties
+    if (!user.role || !user.role._id) {
+      throw new Error('User role is missing or invalid');
+    }
+
     const tokenPayload = {
       userId: user._id,
       email: user.email,
