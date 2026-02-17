@@ -16,7 +16,7 @@ const paymentSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['Cash', 'Card', 'Fonepay', 'NepalPay'],
+    enum: ['Cash', 'Card', 'Fonepay', 'NepalPay', 'Khalti'],
     required: true,
   },
   paymentStatus: {
@@ -29,6 +29,10 @@ const paymentSchema = new mongoose.Schema({
     ref: 'User',
   },
   transactionId: {
+    type: String,
+    trim: true,
+  },
+  khaltiPidx: {
     type: String,
     trim: true,
   },
@@ -47,5 +51,6 @@ paymentSchema.index({ paymentMethod: 1 });
 paymentSchema.index({ transactionId: 1 }, { sparse: true });
 paymentSchema.index({ paymentTime: -1 });
 paymentSchema.index({ table: 1, paymentStatus: 1 });
+paymentSchema.index({ khaltiPidx: 1 }, { sparse: true });
 
 export default mongoose.model('Payment', paymentSchema);

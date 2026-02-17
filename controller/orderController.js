@@ -3,6 +3,7 @@ import Table from "../models/Table.js";
 import Menu from "../models/Menu.js";
 import User from "../models/User.js";
 import { setNewOrderTimeout, clearOrderTimeout } from '../utils/orderTimeoutManager.js';
+import { emitOrderEvent } from '../utils/socket.js';
 
 class OrderController {
   constructor() {
@@ -111,6 +112,13 @@ class OrderController {
         .lean();
 
       console.log(`✅ Order created for table ${table.tableNumber}, customer: ${customerName}`);
+
+      // Emit socket event for new order
+      emitOrderEvent('order:new', {
+        orderId: savedOrder._id.toString(),
+        tableId: tableId,
+        order: populatedOrder,
+      });
 
       res.status(201).json({
         success: true,
@@ -337,6 +345,13 @@ class OrderController {
         });
       }
 
+      // Emit socket event
+      emitOrderEvent('order:status-updated', {
+        orderId: id,
+        tableId: updatedOrder.table?._id?.toString(),
+        order: updatedOrder,
+      });
+
       res.status(200).json({
         success: true,
         message: "Order status updated successfully",
@@ -406,6 +421,13 @@ class OrderController {
         .populate('table', 'tableNumber capacity')
         .populate('items.menuItem', 'name category image')
         .lean();
+
+      // Emit socket event
+      emitOrderEvent('order:item-updated', {
+        orderId: orderId,
+        tableId: updatedOrder.table?._id?.toString(),
+        order: updatedOrder,
+      });
 
       res.status(200).json({
         success: true,
@@ -481,6 +503,13 @@ class OrderController {
         .populate('items.menuItem', 'name category image')
         .lean();
 
+      // Emit socket event
+      emitOrderEvent('order:items-added', {
+        orderId: id,
+        tableId: updatedOrder.table?._id?.toString(),
+        order: updatedOrder,
+      });
+
       res.status(200).json({
         success: true,
         message: "Items added to order successfully",
@@ -542,6 +571,13 @@ class OrderController {
         .populate('table', 'tableNumber capacity')
         .populate('items.menuItem', 'name category image')
         .lean();
+
+      // Emit socket event
+      emitOrderEvent('order:cancelled', {
+        orderId: id,
+        tableId: updatedOrder.table?._id?.toString(),
+        order: updatedOrder,
+      });
 
       res.status(200).json({
         success: true,

@@ -6,7 +6,9 @@ import {
   getPaymentByOrder,
   updatePaymentStatus,
   processRefund,
-  getDailySalesReport
+  getDailySalesReport,
+  initiateKhaltiPayment,
+  handleKhaltiCallback
 } from '../controller/paymentController.js';
 import {
   validatePaymentProcessing,
@@ -23,7 +25,11 @@ import { generalLimiter, paymentLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
-// Protected routes (all payment operations require authentication)
+// Public Khalti routes (no auth required - customer-facing)
+router.post('/khalti/initiate', paymentLimiter, initiateKhaltiPayment);
+router.get('/khalti/callback', generalLimiter, handleKhaltiCallback);
+
+// Protected routes (all other payment operations require authentication)
 router.use(authMiddleware);
 
 // Process payment

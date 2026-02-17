@@ -3,13 +3,16 @@ import Order from "../models/Order.js";
 import Table from "../models/Table.js";
 import User from "../models/User.js";
 import { clearOrderTimeout } from '../utils/orderTimeoutManager.js';
+import khaltiProvider from '../utils/khaltiProvider.js';
+import khaltiConfig from '../config/khaltiConfig.js';
+import { emitOrderEvent } from '../utils/socket.js';
 
 class PaymentController {
   constructor() {
     this.defaultPaginationLimit = 20;
     this.maxPaginationLimit = 100;
     this.validSortFields = ['paymentTime', 'amount', 'createdAt', 'updatedAt'];
-    this.validPaymentMethods = ['Cash', 'Card', 'Fonepay', 'NepalPay'];
+    this.validPaymentMethods = ['Cash', 'Card', 'Fonepay', 'NepalPay', 'Khalti'];
     this.validPaymentStatuses = ['Paid', 'Pending', 'Failed', 'Refunded'];
   }
 
@@ -137,6 +140,15 @@ class PaymentController {
         .lean();
 
       console.log(`✅ Payment processed for order ${orderId}, method: ${paymentMethod}, amount: ${numAmount}`);
+
+      // Emit socket event when payment is completed
+      if (paymentData.paymentStatus === 'Paid') {
+        emitOrderEvent('order:paid', {
+          orderId: orderId,
+          tableId: order.table._id.toString(),
+          order: populatedPayment,
+        });
+      }
 
       res.status(201).json({
         success: true,
@@ -452,6 +464,170 @@ class PaymentController {
     }
   }
 
+  // Initiate Khalti payment (public - called by customers)
+  async initiateKhaltiPayment(req, res) {
+    try {
+      const { orderId } = req.body;
+
+      if (!orderId || !this.isValidObjectId(orderId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Valid order ID is required"
+        });
+      }
+
+      if (!khaltiConfig.secretKey) {
+        return res.status(503).json({
+          success: false,
+          message: "Khalti payment is not configured"
+        });
+      }
+
+      const order = await Order.findById(orderId).populate('table');
+      if (!order) {
+        return res.status(404).json({ success: false, message: "Order not found" });
+      }
+
+      if (!['Served', 'Pending', 'InKitchen'].includes(order.status)) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot process payment for ${order.status.toLowerCase()} order`
+        });
+      }
+
+      // Check for existing paid/pending payment
+      const existingPayment = await Payment.findOne({
+        order: orderId,
+        paymentStatus: { $in: ['Paid', 'Pending'] }
+      });
+
+      if (existingPayment) {
+        // If there's an existing pending Khalti payment, return its URL info
+        if (existingPayment.paymentMethod === 'Khalti' && existingPayment.paymentStatus === 'Pending' && existingPayment.khaltiPidx) {
+          return res.status(200).json({
+            success: true,
+            message: "Existing Khalti payment found, please complete it",
+            data: { pidx: existingPayment.khaltiPidx, paymentId: existingPayment._id }
+          });
+        }
+        return res.status(409).json({
+          success: false,
+          message: "Payment already exists for this order"
+        });
+      }
+
+      const amountInPaisa = Math.round(order.finalAmount * 100);
+      const purchaseOrderName = `Order for ${order.customerName} - Table ${order.table?.tableNumber || 'N/A'}`;
+
+      // Call Khalti API to initiate payment
+      const khaltiResponse = await khaltiProvider.initiatePayment(
+        amountInPaisa,
+        orderId.toString(),
+        purchaseOrderName
+      );
+
+      // Create a pending payment record
+      const payment = new Payment({
+        order: orderId,
+        table: order.table._id,
+        amount: order.finalAmount,
+        paymentMethod: 'Khalti',
+        paymentStatus: 'Pending',
+        khaltiPidx: khaltiResponse.pidx,
+        paymentTime: new Date()
+      });
+      await payment.save();
+
+      console.log(`💜 Khalti payment initiated for order ${orderId}, pidx: ${khaltiResponse.pidx}`);
+
+      res.status(200).json({
+        success: true,
+        message: "Khalti payment initiated",
+        data: {
+          paymentId: payment._id,
+          pidx: khaltiResponse.pidx,
+          payment_url: khaltiResponse.payment_url,
+          expires_at: khaltiResponse.expires_at,
+        }
+      });
+
+    } catch (error) {
+      this.handleError(error, res, 'Error initiating Khalti payment');
+    }
+  }
+
+  // Handle Khalti callback (public - redirected from Khalti after payment)
+  async handleKhaltiCallback(req, res) {
+    const frontendUrl = khaltiConfig.websiteUrl || 'http://localhost:3000';
+
+    try {
+      const { pidx, purchase_order_id, status } = req.query;
+
+      if (!pidx) {
+        return res.redirect(`${frontendUrl}/order/payment-result?status=error&message=Missing+payment+identifier`);
+      }
+
+      // Find the payment record by pidx
+      const payment = await Payment.findOne({ khaltiPidx: pidx }).populate({
+        path: 'order',
+        populate: { path: 'table' }
+      });
+
+      if (!payment) {
+        return res.redirect(`${frontendUrl}/order/payment-result?status=error&message=Payment+record+not+found`);
+      }
+
+      const order = payment.order;
+      const tableNumber = order?.table?.tableNumber || '';
+
+      // Verify with Khalti server
+      const verification = await khaltiProvider.verifyPayment(pidx);
+
+      if (verification.status === 'Completed') {
+        // Payment successful
+        payment.paymentStatus = 'Paid';
+        payment.transactionId = verification.transaction_id || pidx;
+        payment.paymentTime = new Date();
+        await payment.save();
+
+        // Update order status
+        await Order.findByIdAndUpdate(order._id, { status: 'Paid' });
+        clearOrderTimeout(order._id.toString());
+
+        // Free the table
+        if (order.table) {
+          await Table.findByIdAndUpdate(order.table._id, {
+            status: 'Available',
+            currentOrder: null
+          });
+        }
+
+        console.log(`✅ Khalti payment verified for order ${order._id}, txn: ${verification.transaction_id}`);
+
+        // Emit socket event for Khalti payment success
+        emitOrderEvent('order:paid', {
+          orderId: order._id.toString(),
+          tableId: order.table?._id?.toString(),
+          order: { ...order.toObject?.() || order, status: 'Paid' },
+        });
+
+        return res.redirect(`${frontendUrl}/order/table/${tableNumber}/payment-result?status=success&orderId=${order._id}`);
+      } else {
+        // Payment failed or pending
+        payment.paymentStatus = 'Failed';
+        await payment.save();
+
+        console.log(`❌ Khalti payment failed for order ${order._id}, status: ${verification.status}`);
+
+        return res.redirect(`${frontendUrl}/order/table/${tableNumber}/payment-result?status=failed&orderId=${order._id}`);
+      }
+
+    } catch (error) {
+      console.error('Khalti callback error:', error.message);
+      return res.redirect(`${frontendUrl}/order/payment-result?status=error&message=Verification+failed`);
+    }
+  }
+
   // Get daily sales report
   async getDailySalesReport(req, res) {
     try {
@@ -761,6 +937,8 @@ export const getPaymentByOrder = (req, res) => paymentController.getPaymentByOrd
 export const updatePaymentStatus = (req, res) => paymentController.updatePaymentStatus(req, res);
 export const processRefund = (req, res) => paymentController.processRefund(req, res);
 export const getDailySalesReport = (req, res) => paymentController.getDailySalesReport(req, res);
+export const initiateKhaltiPayment = (req, res) => paymentController.initiateKhaltiPayment(req, res);
+export const handleKhaltiCallback = (req, res) => paymentController.handleKhaltiCallback(req, res);
 
 // Export class for advanced usage
 export { PaymentController };

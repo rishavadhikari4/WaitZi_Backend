@@ -20,8 +20,8 @@ export const validatePaymentProcessing = [
     .withMessage('Please provide a valid order ID'),
 
   body('paymentMethod')
-    .isIn(['Cash', 'Card', 'Fonepay', 'NepalPay'])
-    .withMessage('Payment method must be Cash, Card, Fonepay, or NepalPay'),
+    .isIn(['Cash', 'Card', 'Fonepay', 'NepalPay', 'Khalti'])
+    .withMessage('Payment method must be Cash, Card, Fonepay, NepalPay, or Khalti'),
 
   body('amount')
     .isFloat({ min: 0.01 })
@@ -109,8 +109,8 @@ export const validatePaymentQuery = [
 
   query('paymentMethod')
     .optional()
-    .isIn(['Cash', 'Card', 'Fonepay', 'NepalPay'])
-    .withMessage('Payment method must be Cash, Card, Fonepay, or NepalPay'),
+    .isIn(['Cash', 'Card', 'Fonepay', 'NepalPay', 'Khalti'])
+    .withMessage('Payment method must be Cash, Card, Fonepay, NepalPay, or Khalti'),
 
   query('startDate')
     .optional()

@@ -1,3 +1,4 @@
+import http from "http";
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -6,10 +7,12 @@ import connectDB from "./config/dbConfig.js";
 import routes from "./routes/index.js";
 import { initializeAdminRole } from "./controller/roleController.js";
 import { initializeTimeoutManager, cleanupTimeouts } from "./utils/orderTimeoutManager.js";
+import { initializeSocket } from "./utils/socket.js";
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
 
 const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -56,9 +59,12 @@ const startServer = async () => {
         // Setup routes
         app.use('/api', routes);
 
+        // Initialize Socket.IO
+        initializeSocket(server, allowedOrigins);
+
         // Start server based on environment
         if (isProduction) {
-            app.listen(PORT, () => {
+            server.listen(PORT, () => {
                 console.log(`🚀 Production server running on port ${PORT}`);
                 console.log(`📊 Environment: ${process.env.NODE_ENV}`);
                 console.log(`🔗 Server URL: ${process.env.FRONTEND_URL || 'Not configured'}`);
@@ -67,7 +73,7 @@ const startServer = async () => {
                 console.log(`👑 Admin role: Initialized and ready`);
             });
         } else if (isDevelopment) {
-            app.listen(PORT, '0.0.0.0', () => {
+            server.listen(PORT, '0.0.0.0', () => {
                 console.log(`🚀 Development server running on http://localhost:${PORT}`);
                 console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
                 console.log(`🌐 Network access: http://0.0.0.0:${PORT}`);
@@ -77,7 +83,7 @@ const startServer = async () => {
                 console.log(`🛠️  Development features enabled`);
             });
         } else {
-            app.listen(PORT, () => {
+            server.listen(PORT, () => {
                 console.log(`🚀 Server running on port ${PORT}`);
                 console.log(`👑 Admin role: Initialized and ready`);
             });
