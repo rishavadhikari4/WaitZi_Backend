@@ -741,8 +741,6 @@ export const deleteTable = (req, res) => tableController.deleteTable(req, res);
 export const updateTableStatus = (req, res) => tableController.updateTableStatus(req, res);
 export const assignOrderToTable = (req, res) => tableController.assignOrderToTable(req, res);
 export const clearOrderFromTable = (req, res) => tableController.clearOrderFromTable(req, res);
-export const checkTableAvailability = (req, res) => tableController.checkTableAvailability(req, res);
-export const resetTableForNewCustomers = (req, res) => tableController.resetTableForNewCustomers(req, res);
 
 // Export class for advanced usage
 export { TableController };

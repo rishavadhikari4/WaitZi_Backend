@@ -9,8 +9,6 @@ import {
   updateTableStatus,
   assignOrderToTable,
   clearOrderFromTable,
-  checkTableAvailability,
-  resetTableForNewCustomers
 } from '../controller/tableController.js';
 import {
   validateTableCreation,
