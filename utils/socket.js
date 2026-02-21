@@ -58,8 +58,9 @@ export function emitOrderEvent(event, { orderId, tableId, order }) {
   if (!io) return;
   const payload = { orderId, tableId, order };
 
-  // Always emit to dashboard
+  // Always emit to dashboard (analytics refresh) and admin-alerts (persistent layout notification)
   io.to('dashboard').emit(event, payload);
+  io.to('admin-alerts').emit(event, payload);
 
   // Emit to kitchen for relevant events
   if (['order:new', 'order:status-updated', 'order:item-updated', 'order:cancelled', 'order:items-added'].includes(event)) {

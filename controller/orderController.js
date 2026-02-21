@@ -254,9 +254,13 @@ class OrderController {
         });
       }
 
-      const filter = { table: tableId };
+      // By default only show active orders so customers don't see old paid/cancelled orders
+      const filter = {
+        table: tableId,
+        status: { $nin: ['Paid', 'Cancelled', 'Completed'] }
+      };
       if (status) {
-        filter.status = status;
+        filter.status = status; // Allow explicit override (e.g. staff viewing history)
       }
 
       const orders = await Order.find(filter)
@@ -645,13 +649,15 @@ class OrderController {
   // Get kitchen orders (orders in kitchen workflow)
   async getKitchenOrders(req, res) {
     try {
-      const { status = 'InKitchen' } = req.query;
+      const { status } = req.query;
 
+      // Always show Pending + InKitchen by default — kitchen needs both
       const filter = {
         status: { $in: ['Pending', 'InKitchen'] }
       };
 
-      if (status !== 'all') {
+      // Only narrow to a single status when caller explicitly requests it
+      if (status && status !== 'all') {
         filter.status = status;
       }
 

@@ -38,14 +38,16 @@ router.use(authMiddleware); // All routes below require authentication
 // Get all orders
 router.get('/', generalLimiter, validateOrderQuery, getAllOrders);
 
-// Get single order
-router.get('/:id', generalLimiter, validateMongoId, getOrderById);
+// IMPORTANT: Specific sub-paths must be defined BEFORE /:id to avoid being swallowed
+
+// Get kitchen orders (for kitchen staff)
+router.get('/kitchen/queue', generalLimiter, validateKitchenOrdersQuery, getKitchenOrders);
 
 // Get orders by table (staff view)
 router.get('/table/:tableId', generalLimiter, validateTableId, getOrdersByTable);
 
-// Get kitchen orders (for kitchen staff)
-router.get('/kitchen/queue', generalLimiter, validateKitchenOrdersQuery, getKitchenOrders);
+// Get single order
+router.get('/:id', generalLimiter, validateMongoId, getOrderById);
 
 // Update order status (staff/manager)
 router.patch('/:id/status', generalLimiter, validateOrderStatusUpdate, updateOrderStatus);
