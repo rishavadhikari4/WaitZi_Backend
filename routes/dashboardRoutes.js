@@ -23,8 +23,8 @@ router.use(authMiddleware);
 // Real-time status (accessible by all staff)
 router.get('/real-time', analyticsLimiter, getRealTimeStatus);
 
-// Manager/Admin only analytics routes
-router.use(authorizeRole(['admin', 'manager', 'accountant']));
+// Admin only analytics routes
+router.use(authorizeRole(['admin']));
 
 // Dashboard overview
 router.get('/overview', analyticsLimiter, validateOverviewQuery, getDashboardOverview);

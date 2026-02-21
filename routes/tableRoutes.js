@@ -48,8 +48,8 @@ router.patch('/:id/status', generalLimiter, validateTableStatusUpdate, updateTab
 router.post('/assign-order', generalLimiter, validateOrderAssignment, assignOrderToTable);
 router.patch('/:id/clear', generalLimiter, validateMongoId, clearOrderFromTable);
 
-// Manager/Admin only routes
-router.use(authorizeRole(['admin', 'manager']));
+// Admin only routes
+router.use(authorizeRole(['admin']));
 
 // Create table
 router.post('/', generalLimiter, validateTableCreation, createTable);

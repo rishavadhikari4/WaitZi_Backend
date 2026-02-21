@@ -7,14 +7,6 @@ class RoleController {
       admin: {
         name: 'admin',
         description: 'System administrator with full access to all features and data'
-      },
-      manager: {
-        name: 'manager', 
-        description: 'Manager with access to operational features'
-      },
-      staff: {
-        name: 'staff',
-        description: 'Staff member with limited access'
       }
     };
   }

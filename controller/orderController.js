@@ -928,8 +928,8 @@ class OrderController {
         status: 'Active'
       }).populate('role');
       
-      const activeWaiters = waiters.filter(user => 
-        user.role.name.toLowerCase() === 'waiter' || user.role.name.toLowerCase() === 'staff'
+      const activeWaiters = waiters.filter(user =>
+        user.role.name.toLowerCase() === 'admin'
       );
 
       if (activeWaiters.length === 0) {

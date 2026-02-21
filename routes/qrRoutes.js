@@ -29,8 +29,8 @@ router.get('/generate/:tableId', qrLimiter, validateTableId, generateTableQR);
 // Download QR code as image file
 router.get('/download/:tableId', qrLimiter, validateTableId, downloadQRCode);
 
-// Manager/Admin only routes
-router.use(authorizeRole(['admin', 'manager']));
+// Admin only routes
+router.use(authorizeRole(['admin']));
 
 // Generate QR codes for all tables
 router.get('/generate-all', qrLimiter, generateAllTableQRs);

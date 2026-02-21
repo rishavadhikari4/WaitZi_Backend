@@ -36,8 +36,8 @@ router.put('/profile', uploadLimiter, upload.single('image'), validateProfileUpd
 // Password update (any authenticated user can update their own password)
 router.patch('/:id/password', generalLimiter, validatePasswordUpdate, updateUserPassword);
 
-// Manager/Admin only routes for user management
-router.use(authorizeRole(['admin', 'manager']));
+// Admin only routes for user management
+router.use(authorizeRole(['admin']));
 
 // Get all users
 router.get('/', generalLimiter, validateUserQuery, getAllUsers);

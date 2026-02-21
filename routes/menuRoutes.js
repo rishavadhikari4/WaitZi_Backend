@@ -40,8 +40,8 @@ router.get('/category/:categoryId', generalLimiter, validateCategoryId, getMenuB
 // Get single menu item (staff)
 router.get('/:id', generalLimiter, validateMongoId, getMenuItemById);
 
-// Admin/Manager only routes
-router.use(authorizeRole(['admin', 'manager']));
+// Admin only routes
+router.use(authorizeRole(['admin']));
 
 // Create menu item (with image upload)
 router.post('/', uploadLimiter, upload.single('image'), validateMenuItemCreation, createMenuItem);

@@ -47,8 +47,8 @@ router.get('/order/:orderId', generalLimiter, validateOrderId, getPaymentByOrder
 // Update payment status (for digital payment confirmations)
 router.patch('/:id/status', generalLimiter, validatePaymentStatusUpdate, updatePaymentStatus);
 
-// Manager/Admin only routes
-router.use(authorizeRole(['admin', 'manager', 'accountant']));
+// Admin only routes
+router.use(authorizeRole(['admin']));
 
 // Process refund
 router.post('/:id/refund', paymentLimiter, validateRefundProcessing, processRefund);

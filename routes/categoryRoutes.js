@@ -23,9 +23,9 @@ const router = express.Router();
 router.get('/', generalLimiter, validateCategoryQuery, getAllCategories);
 router.get('/:id', generalLimiter, validateMongoId, getCategoryById);
 
-// Protected routes (Manager/Admin only)
+// Protected routes (Admin only)
 router.use(authMiddleware);
-router.use(authorizeRole(['admin', 'manager']));
+router.use(authorizeRole(['admin']));
 
 // Create category (with image upload)
 router.post('/', uploadLimiter, uploadSingle('image'), validateCategoryCreation, createCategory);

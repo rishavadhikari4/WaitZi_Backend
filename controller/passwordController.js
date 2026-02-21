@@ -2,6 +2,7 @@ import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import emailWorker from '../utils/emailWorker.js';
 
 class PasswordController {
   constructor() {
@@ -43,17 +44,21 @@ class PasswordController {
       user.resetPasswordExpires = new Date(Date.now() + this.resetTokenExpiry);
       await user.save();
 
-      // In a real application, send email here
-      // For now, we'll return the token (remove in production)
+      // Build reset URL
       const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
       
-      // TODO: Send email with reset link
-      console.log(`🔑 Password reset requested for ${email}`);
-      console.log(`🔗 Reset URL: ${resetUrl}`);
+      // Send password reset email
+      try {
+        await emailWorker.sendPasswordResetEmail(email, resetUrl, user.name || user.email);
+        console.log(`🔑 Password reset email sent to ${email}`);
+      } catch (emailError) {
+        console.error('Failed to send password reset email:', emailError);
+        // Continue with success response even if email fails (for security)
+      }
       
       const response = {
         success: true,
-        message: "Password reset link sent to your email",
+        message: "If an account with that email exists, a reset link has been sent",
       };
 
       // Only include reset token in development
