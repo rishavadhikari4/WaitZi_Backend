@@ -201,32 +201,39 @@ class DashboardController {
   // Get real-time restaurant status
   async getRealTimeStatus(req, res) {
     try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
       const [
-        currentOrders,
-        activeTables,
+        activeOrders,
+        pendingOrders,
         kitchenQueue,
-        waitingCustomers,
+        tableStats,
         staffOnDuty,
-        todaysSummary
+        revenueResult
       ] = await Promise.all([
-        this.getCurrentOrders(),
-        this.getActiveTables(),
-        this.getKitchenQueue(),
-        this.getWaitingCustomers(),
-        this.getStaffOnDuty(),
-        this.getTodaysSummary()
+        Order.countDocuments({ status: { $in: ['Pending', 'InKitchen', 'Served'] } }),
+        Order.countDocuments({ status: 'Pending' }),
+        Order.countDocuments({ status: 'InKitchen' }),
+        this.getTableStatusSummary(),
+        User.countDocuments({ status: 'Active' }),
+        Payment.aggregate([
+          { $match: { paymentTime: { $gte: todayStart }, paymentStatus: 'Paid' } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ])
       ]);
 
       res.status(200).json({
         success: true,
         message: "Real-time status retrieved successfully",
         data: {
-          currentOrders,
-          tables: activeTables,
-          kitchen: kitchenQueue,
-          customers: waitingCustomers,
-          staff: staffOnDuty,
-          todaySummary: todaysSummary,
+          activeOrders,
+          pendingOrders,
+          kitchenQueue,
+          availableTables: tableStats.byStatus.available ?? 0,
+          occupiedTables: tableStats.byStatus.occupied ?? 0,
+          staffOnDuty,
+          totalRevenue: revenueResult[0]?.total ?? 0,
           lastUpdated: new Date().toISOString()
         }
       });

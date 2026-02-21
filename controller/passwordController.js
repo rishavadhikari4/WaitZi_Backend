@@ -45,7 +45,7 @@ class PasswordController {
       await user.save();
 
       // Build reset URL
-      const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+      const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
       
       // Send password reset email
       try {
