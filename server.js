@@ -17,8 +17,8 @@ const server = http.createServer(app);
 const isProduction = process.env.NODE_ENV === 'production';
 const isDevelopment = process.env.NODE_ENV === 'development';
 
-// Trust proxy for rate limiting and correct IP detection when behind reverse proxy
-app.set('trust proxy', true);
+// Trust one proxy hop (Render/nginx) for correct IP detection and rate limiting
+app.set('trust proxy', 1);
 
 // Support multiple frontend origins (comma-separated in FRONTEND_URL env var)
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')

@@ -11,7 +11,7 @@ class EmailWorker {
   async initialize() {
     if (this.initialized) return;
 
-    this.transporter = nodemailer.createTransporter({
+    this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: process.env.SMTP_PORT || 587,
       secure: false,

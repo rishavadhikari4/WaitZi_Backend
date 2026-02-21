@@ -54,9 +54,6 @@ router.put('/:id', uploadLimiter, upload.single('image'), validateUserUpdate, up
 // Update user status
 router.patch('/:id/status', generalLimiter, validateUserStatusUpdate, updateUserStatus);
 
-// Admin only routes
-router.use(authorizeRole(['admin']));
-
 // Delete user
 router.delete('/:id', generalLimiter, validateMongoId, deleteUser);
 
