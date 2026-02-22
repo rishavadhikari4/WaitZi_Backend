@@ -5,9 +5,10 @@ class FileUploadMiddleware {
     constructor() {
         this.allowedTypes = /jpeg|jpg|png/;
         this.storage = multer.memoryStorage();
-        this.upload = multer({ 
-            storage: this.storage, 
-            fileFilter: this.fileFilter.bind(this) 
+        this.upload = multer({
+            storage: this.storage,
+            limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5242880 },
+            fileFilter: this.fileFilter.bind(this)
         });
     }
 

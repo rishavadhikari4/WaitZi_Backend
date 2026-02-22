@@ -886,7 +886,7 @@ class OrderController {
   // Check kitchen capacity to prevent overload
   async checkKitchenCapacity() {
     try {
-      const maxConcurrentOrders = parseInt(process.env.MAX_KITCHEN_ORDERS) || 20;
+      const maxConcurrentOrders = parseInt(process.env.KITCHEN_CAPACITY) || 10;
       
       const activeOrders = await Order.countDocuments({
         status: { $in: ['Pending', 'InKitchen'] }
@@ -934,9 +934,12 @@ class OrderController {
         status: 'Active'
       }).populate('role');
       
-      const activeWaiters = waiters.filter(user =>
-        user.role.name.toLowerCase() === 'admin'
+      const nonAdminStaff = waiters.filter(user =>
+        user.role.name.toLowerCase() !== 'admin'
       );
+
+      // Fall back to admins if no other staff exists
+      const activeWaiters = nonAdminStaff.length > 0 ? nonAdminStaff : waiters;
 
       if (activeWaiters.length === 0) {
         return null;
