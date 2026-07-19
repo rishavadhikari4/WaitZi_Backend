@@ -120,16 +120,20 @@ class PaymentController {
 
       // Update order status to paid if payment is successful
       if (paymentData.paymentStatus === 'Paid') {
-        await Order.findByIdAndUpdate(orderId, { status: 'Paid' });
-        
-        // Clear timeout since payment is completed
+        // Clear timeout since payment is secured either way
         clearOrderTimeout(orderId);
-        
-        // Clear table
-        await Table.findByIdAndUpdate(order.table._id, {
-          status: 'Available',
-          currentOrder: null
-        });
+
+        if (order.status === 'Served') {
+          // Normal pay-after-service flow: order is done, free up the table
+          await Order.findByIdAndUpdate(orderId, { status: 'Paid' });
+          await Table.findByIdAndUpdate(order.table._id, {
+            status: 'Available',
+            currentOrder: null
+          });
+        } else {
+          // Prepayment: order hasn't reached the kitchen/served yet, let that continue normally
+          await Order.findByIdAndUpdate(orderId, { isPrepaid: true });
+        }
       }
 
       // Populate the saved payment for response
@@ -349,17 +353,23 @@ class PaymentController {
 
       // Update order status based on payment status
       if (paymentStatus === 'Paid') {
-        await Order.findByIdAndUpdate(payment.order, { status: 'Paid' });
-        
-        // Clear table
-        await Table.findByIdAndUpdate(payment.table, {
-          status: 'Available',
-          currentOrder: null
-        });
-      } else if (paymentStatus === 'Failed') {
-        // Optionally update order status back to served if payment failed
-        await Order.findByIdAndUpdate(payment.order, { status: 'Served' });
+        const relatedOrder = await Order.findById(payment.order);
+        clearOrderTimeout(payment.order.toString());
+
+        if (relatedOrder?.status === 'Served') {
+          // Normal pay-after-service flow: order is done, free up the table
+          await Order.findByIdAndUpdate(payment.order, { status: 'Paid' });
+          await Table.findByIdAndUpdate(payment.table, {
+            status: 'Available',
+            currentOrder: null
+          });
+        } else {
+          // Prepayment: order hasn't reached the kitchen/served yet, let that continue normally
+          await Order.findByIdAndUpdate(payment.order, { isPrepaid: true });
+        }
       }
+      // Note: a failed digital payment intentionally leaves the order/table state untouched
+      // so the kitchen workflow (or a payment retry) isn't disrupted.
 
       console.log(`✅ Payment ${id} status updated to ${paymentStatus}`);
 
@@ -590,16 +600,21 @@ class PaymentController {
         payment.paymentTime = new Date();
         await payment.save();
 
-        // Update order status
-        await Order.findByIdAndUpdate(order._id, { status: 'Paid' });
         clearOrderTimeout(order._id.toString());
 
-        // Free the table
-        if (order.table) {
-          await Table.findByIdAndUpdate(order.table._id, {
-            status: 'Available',
-            currentOrder: null
-          });
+        const wasServed = order.status === 'Served';
+        if (wasServed) {
+          // Normal pay-after-service flow: order is done, free up the table
+          await Order.findByIdAndUpdate(order._id, { status: 'Paid' });
+          if (order.table) {
+            await Table.findByIdAndUpdate(order.table._id, {
+              status: 'Available',
+              currentOrder: null
+            });
+          }
+        } else {
+          // Prepayment: order hasn't reached the kitchen/served yet, let that continue normally
+          await Order.findByIdAndUpdate(order._id, { isPrepaid: true });
         }
 
         console.log(`✅ Khalti payment verified for order ${order._id}, txn: ${verification.transaction_id}`);
@@ -608,7 +623,7 @@ class PaymentController {
         emitOrderEvent('order:paid', {
           orderId: order._id.toString(),
           tableId: order.table?._id?.toString(),
-          order: { ...order.toObject?.() || order, status: 'Paid' },
+          order: { ...order.toObject?.() || order, status: wasServed ? 'Paid' : order.status, isPrepaid: !wasServed || order.isPrepaid },
         });
 
         return res.redirect(`${frontendUrl}/order/table/${tableNumber}/payment-result?status=success&orderId=${order._id}`);

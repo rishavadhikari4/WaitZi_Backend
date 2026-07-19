@@ -80,6 +80,10 @@ const orderSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  isPrepaid: {
+    type: Boolean,
+    default: false,
+  },
   note: {
     type: String,
     trim: true,

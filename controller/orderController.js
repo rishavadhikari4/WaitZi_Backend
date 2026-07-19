@@ -412,14 +412,26 @@ class OrderController {
       // Auto-update order status based on item statuses
       const allItemsServed = order.items.every(item => item.status === 'Served');
       const anyItemCooking = order.items.some(item => ['Cooking', 'Ready'].includes(item.status));
+      const justFinishedPrepaidOrder = allItemsServed && order.isPrepaid && order.status !== 'Paid';
 
-      if (allItemsServed && order.status !== 'Served') {
+      if (justFinishedPrepaidOrder) {
+        // Already paid at checkout - no need to wait at "Served" for a payment step
+        order.status = 'Paid';
+      } else if (allItemsServed && order.status !== 'Served') {
         order.status = 'Served';
       } else if (anyItemCooking && order.status === 'Pending') {
         order.status = 'InKitchen';
       }
 
       await order.save();
+
+      if (justFinishedPrepaidOrder) {
+        clearOrderTimeout(orderId);
+        await Table.findByIdAndUpdate(order.table, {
+          status: 'Available',
+          currentOrder: null
+        });
+      }
 
       const updatedOrder = await Order.findById(orderId)
         .populate('table', 'tableNumber capacity')
@@ -432,6 +444,14 @@ class OrderController {
         tableId: updatedOrder.table?._id?.toString(),
         order: updatedOrder,
       });
+
+      if (justFinishedPrepaidOrder) {
+        emitOrderEvent('order:paid', {
+          orderId: orderId,
+          tableId: updatedOrder.table?._id?.toString(),
+          order: updatedOrder,
+        });
+      }
 
       res.status(200).json({
         success: true,
