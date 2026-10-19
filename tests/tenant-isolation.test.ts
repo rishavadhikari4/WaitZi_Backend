@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import pg from 'pg';
-import { asPlatform, withTenant, disconnectDb } from '../db/client.js';
+import { asPlatform, withTenant, disconnectDB, type TenantTx } from '../src/config/prisma.js';
 
 // Two organizations with one of everything. Every test asks: can org A see,
 // change or create anything belonging to org B? The answer must always be no,
 // and it must be the database (RLS) saying no, not application code.
 
-async function makeOrg(slug) {
+async function makeOrg(slug: string) {
   return asPlatform('test: create org', async (db) => {
     const org = await db.organization.create({ data: { name: slug, slug } });
     const branch = await db.branch.create({ data: { orgId: org.id, name: 'Main' } });
@@ -35,37 +35,44 @@ async function makeOrg(slug) {
 // The same_org_refs trigger raises foreign_key_violation, which Prisma reports as P2003.
 const FK_VIOLATION = /Foreign key constraint violated/;
 
-let A;
-let B;
-const asA = (fn) => withTenant({ orgId: A.org.id, userId: A.user.id }, fn);
+type Fixture = Awaited<ReturnType<typeof makeOrg>>;
+let A: Fixture;
+let B: Fixture;
+const asA = <T>(fn: (tx: TenantTx) => Promise<T>) => withTenant({ orgId: A.org.id, userId: A.user.id }, fn);
 
 beforeAll(async () => {
   A = await makeOrg('alpha');
   B = await makeOrg('bravo');
 });
 
-afterAll(disconnectDb);
+afterAll(disconnectDB);
 
 // [model delegate, key in the fixture]
-const TENANT_MODELS = [
+type ModelName = 'branch' | 'role' | 'category' | 'menuItem' | 'diningTable' | 'order' | 'orderItem' | 'payment';
+// Prisma delegates don't share a callable union type; the tests only use the
+// common findMany/findUnique/updateMany/deleteMany surface.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const model = (db: unknown, name: ModelName) => (db as Record<ModelName, any>)[name];
+const idOf = (f: Fixture, key: keyof Fixture) => (f[key] as { id: string }).id;
+const TENANT_MODELS: [ModelName, keyof Fixture][] = [
   ['branch', 'branch'], ['role', 'role'], ['category', 'category'], ['menuItem', 'menuItem'],
   ['diningTable', 'table'], ['order', 'order'], ['orderItem', 'orderItem'], ['payment', 'payment'],
 ];
 
 describe('tenant isolation (row-level security)', () => {
-  it.each(TENANT_MODELS)('%s: lists only the current org', async (model, key) => {
-    const rows = await asA((tx) => tx[model].findMany());
-    expect(rows.map((r) => r.id)).toEqual([A[key].id]);
+  it.each(TENANT_MODELS)('%s: lists only the current org', async (name, key) => {
+    const rows: { id: string }[] = await asA((tx) => model(tx, name).findMany());
+    expect(rows.map((r: { id: string }) => r.id)).toEqual([idOf(A, key)]);
   });
 
-  it.each(TENANT_MODELS)('%s: cannot read another org by id', async (model, key) => {
-    expect(await asA((tx) => tx[model].findUnique({ where: { id: B[key].id } }))).toBeNull();
+  it.each(TENANT_MODELS)('%s: cannot read another org by id', async (name, key) => {
+    expect(await asA((tx) => model(tx, name).findUnique({ where: { id: idOf(B, key) } }))).toBeNull();
   });
 
-  it.each(TENANT_MODELS)('%s: cannot update or delete another org', async (model, key) => {
-    expect(await asA((tx) => tx[model].updateMany({ where: { id: B[key].id }, data: {} }))).toEqual({ count: 0 });
-    expect(await asA((tx) => tx[model].deleteMany({ where: { id: B[key].id } }))).toEqual({ count: 0 });
-    const stillThere = await asPlatform('test: verify', (db) => db[model].findUnique({ where: { id: B[key].id } }));
+  it.each(TENANT_MODELS)('%s: cannot update or delete another org', async (name, key) => {
+    expect(await asA((tx) => model(tx, name).updateMany({ where: { id: idOf(B, key) }, data: {} }))).toEqual({ count: 0 });
+    expect(await asA((tx) => model(tx, name).deleteMany({ where: { id: idOf(B, key) } }))).toEqual({ count: 0 });
+    const stillThere = await asPlatform('test: verify', (db) => model(db, name).findUnique({ where: { id: idOf(B, key) } }));
     expect(stillThere).not.toBeNull();
   });
 
@@ -109,7 +116,7 @@ describe('tenant isolation (row-level security)', () => {
   });
 
   it('a connection with no tenant set sees nothing', async () => {
-    const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    const client = new pg.Client({ connectionString: process.env['DATABASE_URL'] });
     await client.connect();
     try {
       for (const t of ['organizations', 'users', 'orders', 'payments', 'menu_items', 'memberships']) {
@@ -122,7 +129,7 @@ describe('tenant isolation (row-level security)', () => {
   });
 
   it('withTenant refuses a missing or malformed org id', async () => {
-    await expect(withTenant({}, async () => 1)).rejects.toThrow(/orgId/);
+    await expect(withTenant({} as { orgId: string }, async () => 1)).rejects.toThrow(/orgId/);
     await expect(withTenant({ orgId: "x' OR 1=1 --" }, async () => 1)).rejects.toThrow(/orgId/);
   });
 });
@@ -179,7 +186,7 @@ describe('RLS coverage', () => {
       WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r'
         AND (c.relname IN ('organizations', 'users')
              OR EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'org_id' AND NOT a.attisdropped))
-      ORDER BY 1`.then((r) => ({ rows: r })));
+      ORDER BY 1`.then((r) => ({ rows: r as { table: string; enabled: boolean; forced: boolean; policies: number }[] })));
     expect(rows.length).toBeGreaterThanOrEqual(13);
     const unprotected = rows.filter((r) => !r.enabled || !r.forced || r.policies === 0).map((r) => r.table);
     expect(unprotected).toEqual([]);

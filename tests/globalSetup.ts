@@ -4,8 +4,8 @@ import pg from 'pg';
 
 // Recreate waitzi_test from scratch and apply every migration, so the tests
 // always exercise the real schema, roles and RLS policies.
-export default async function setup() {
-  const admin = process.env.DATABASE_ADMIN_URL;
+export default async function setup(): Promise<void> {
+  const admin = process.env['DATABASE_ADMIN_URL'];
   if (!admin) throw new Error('DATABASE_ADMIN_URL is not set (see .env.example)');
   const testUrl = admin.replace(/\/waitzi(\?|$)/, '/waitzi_test$1');
   if (testUrl === admin) throw new Error('DATABASE_ADMIN_URL must point at the "waitzi" database');

@@ -2,13 +2,12 @@
 //
 // Tenancy: every tenant-owned table carries org_id and is protected by
 // row-level security (see migrations/*_rls). Never query tenant tables outside
-// withTenant() / asPlatform() in db/client.js.
+// withTenant() / asPlatform() in src/config/prisma.ts.
 //
 // Money is stored as integer paisa (Rs 1 = 100) to avoid float rounding.
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {

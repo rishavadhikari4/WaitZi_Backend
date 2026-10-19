@@ -1,3 +1,4 @@
+// src/constants/permissions.ts
 // Permission catalog and the role templates every new organization gets.
 // Roles are editable per org; checks use permission strings, never role names.
 
@@ -47,12 +48,21 @@ export const PERMISSIONS = {
   'recipe.manage': 'Edit recipes',
   'supplier.manage': 'Manage suppliers',
   'purchase.manage': 'Purchase orders and goods receiving',
-};
+} as const;
 
+export type Permission = keyof typeof PERMISSIONS;
 export const ALL = '*';
 
-export const ROLE_TEMPLATES = [
-  { name: 'owner', description: 'Business owner, full access to the organization', permissions: [ALL] },
+export interface RoleTemplate {
+  name: string;
+  description: string;
+  permissions: string[];
+}
+
+export const ROLE_TEMPLATES: RoleTemplate[] = [
+  // Named 'admin' so the current frontend's role checks keep working until
+  // Stage 2 moves the UI to permission checks.
+  { name: 'admin', description: 'Owner / organization admin, full access to the organization', permissions: [ALL] },
   {
     name: 'manager',
     description: 'Runs the floor: menu, tables, staff, approvals and reports',
@@ -90,6 +100,6 @@ export const ROLE_TEMPLATES = [
   },
 ];
 
-export function hasPermission(granted, perm) {
+export function hasPermission(granted: readonly string[], perm: Permission): boolean {
   return granted.includes(ALL) || granted.includes(perm);
 }
