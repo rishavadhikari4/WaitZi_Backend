@@ -16,5 +16,12 @@ services:
       timeout: 3s
       retries: 30
 
+  # Only for testing the Mongo -> Postgres import: docker compose --profile migration up -d mongo
+  mongo:
+    image: mongo:7
+    profiles: ["migration"]
+    ports:
+      - "127.0.0.1:27018:27017"
+
 volumes:
   pgdata:

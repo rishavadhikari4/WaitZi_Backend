@@ -15,7 +15,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:import-mongo": "tsx prisma/migrate-from-mongo.ts"
   },
   "repository": {
     "type": "git",
