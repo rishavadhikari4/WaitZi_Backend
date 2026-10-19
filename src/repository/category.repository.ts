@@ -2,6 +2,7 @@
 import type { Prisma } from '@prisma/client';
 
 import type { TenantTx } from '../config/prisma.js';
+import { inOrder } from '../utils/Helpers.js';
 
 export interface ICategoryFilters {
   isActive?: boolean;
@@ -24,10 +25,10 @@ class CategoryRepository {
         ],
       }),
     };
-    const [items, total] = await Promise.all([
-      tx.category.findMany({ where, orderBy, ...page }),
-      tx.category.count({ where }),
-    ]);
+    const [items, total] = await inOrder(
+      () => tx.category.findMany({ where, orderBy, ...page }),
+      () => tx.category.count({ where }),
+    );
     return { items, total };
   }
 

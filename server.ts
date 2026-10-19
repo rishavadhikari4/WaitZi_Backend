@@ -4,6 +4,8 @@ import http from 'node:http';
 import app from './src/app.js';
 import config from './src/config/config.js';
 import { connectDB, disconnectDB } from './src/config/prisma.js';
+import { startOrderTimeoutJob, stopOrderTimeoutJob } from './src/jobs/scheduler/orderTimeout.job.js';
+import socketService from './src/services/socket/socket.service.js';
 
 process.on('uncaughtException', (err: Error) => {
   console.error(`Uncaught exception: ${err.message}`);
@@ -14,6 +16,10 @@ await connectDB();
 
 const server = http.createServer(app);
 server.listen(config.app.port, '0.0.0.0');
+
+// Real-time updates (org-isolated rooms) and the order timeout sweep.
+socketService.init(server);
+startOrderTimeoutJob();
 
 server.on('listening', () => {
   console.log(`🚀 WaitZi API on http://localhost:${config.app.port} (${config.app.env})`);
@@ -27,6 +33,8 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 
 async function gracefulShutdown(signal: string) {
   console.log(`\n[${signal}] Shutting down gracefully...`);
+  stopOrderTimeoutJob();
+  await socketService.close().catch((err) => console.error('[Shutdown] Socket.IO close failed:', err));
   server.close(async () => {
     await disconnectDB().catch((err) => console.error('[Shutdown] DB disconnect failed:', err));
     process.exit(0);

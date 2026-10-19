@@ -4,7 +4,7 @@ import OrganizationRepository from '../../repository/organization.repository.js'
 import UserRepository from '../../repository/user.repository.js';
 import UserOrganizationRepository from '../../repository/userOrganization.repository.js';
 import { AppError } from '../../utils/AppError.js';
-import { verifyPassword } from '../../utils/Helpers.js';
+import { verifyPassword, inOrder } from '../../utils/Helpers.js';
 import { signTokenPair, verifyRefreshToken } from '../../utils/tokens.js';
 import type { LoginInput } from '../../validators/auth.schema.js';
 import { memberStatus, memberToApi, platformUserToApi } from '../user/shared/member.mapper.js';
@@ -104,10 +104,10 @@ class AuthService {
   /** The signed-in member with their organization (GET /auth/verify). */
   me = async (orgId: string, userId: string) => {
     return withTenant({ orgId, userId }, async (tx) => {
-      const [member, org] = await Promise.all([
-        UserOrganizationRepository.findMember(tx, orgId, userId),
-        OrganizationRepository.findCurrent(tx, orgId),
-      ]);
+      const [member, org] = await inOrder(
+        () => UserOrganizationRepository.findMember(tx, orgId, userId),
+        () => OrganizationRepository.findCurrent(tx, orgId),
+      );
       if (!member || !org) throw AppError.unauthorized('User not found or inactive', 'ACCOUNT_INACTIVE');
       return memberToApi(member, org);
     });

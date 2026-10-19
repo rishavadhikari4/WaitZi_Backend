@@ -2,6 +2,7 @@
 import type { Prisma, TableStatus } from '@prisma/client';
 
 import type { DBClient, TenantTx } from '../config/prisma.js';
+import { inOrder } from '../utils/Helpers.js';
 
 export const tableInclude = {
   assignedWaiter: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -35,19 +36,19 @@ class DiningTableRepository {
     orderBy: Prisma.DiningTableOrderByWithRelationInput,
   ) {
     const where = this.where(filters);
-    const [items, total] = await Promise.all([
-      tx.diningTable.findMany({ where, include: tableInclude, orderBy, ...page }),
-      tx.diningTable.count({ where }),
-    ]);
+    const [items, total] = await inOrder(
+      () => tx.diningTable.findMany({ where, include: tableInclude, orderBy, ...page }),
+      () => tx.diningTable.count({ where }),
+    );
     return { items, total };
   }
 
   async stats(tx: TenantTx, branchIds?: string[]) {
     const where = this.where({ ...(branchIds && { branchIds }) });
-    const [byStatus, totals] = await Promise.all([
-      tx.diningTable.groupBy({ by: ['status'], where, _count: { _all: true } }),
-      tx.diningTable.aggregate({ where, _count: { _all: true }, _sum: { capacity: true } }),
-    ]);
+    const [byStatus, totals] = await inOrder(
+      () => tx.diningTable.groupBy({ by: ['status'], where, _count: { _all: true } }),
+      () => tx.diningTable.aggregate({ where, _count: { _all: true }, _sum: { capacity: true } }),
+    );
     return { byStatus, total: totals._count._all, totalCapacity: totals._sum.capacity ?? 0 };
   }
 

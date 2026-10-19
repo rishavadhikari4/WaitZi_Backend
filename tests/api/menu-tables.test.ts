@@ -253,7 +253,10 @@ describe('public ordering page', () => {
   it('opens number-only links for a named organization', async () => {
     const ok = await api.get(`/public/tables/number/${table.tableNumber}/ordering?org=mt-alpha`);
     expect(ok.body.data.table.id).toBe(table.id);
-    expect((await api.get(`/public/tables/number/${table.tableNumber}/ordering`)).status).toBe(404);
+    expect((await api.get(`/public/tables/number/${table.tableNumber}/ordering?org=no-such-place`)).status).toBe(404);
+    // Without ?org the server's DEFAULT_ORG_SLUG decides; it must never fall back to this org's table.
+    const noOrg = await api.get(`/public/tables/number/${table.tableNumber}/ordering`);
+    if (noOrg.status === 200) expect(noOrg.body.data.table.id).not.toBe(table.id);
   });
 
   it('404s unknown or malformed identifiers', async () => {

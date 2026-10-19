@@ -3,6 +3,7 @@
 import type { ActiveStatus, Prisma } from '@prisma/client';
 
 import type { DBClient, TenantTx } from '../config/prisma.js';
+import { inOrder } from '../utils/Helpers.js';
 
 export const memberInclude = {
   user: true,
@@ -55,10 +56,10 @@ class UserOrganizationRepository {
     sort: { field: MemberSortField; dir: 'asc' | 'desc' },
   ) {
     const w = where(filters);
-    const [items, total] = await Promise.all([
-      tx.membership.findMany({ where: w, include: memberInclude, orderBy: orderBy(sort.field, sort.dir), ...page }),
-      tx.membership.count({ where: w }),
-    ]);
+    const [items, total] = await inOrder(
+      () => tx.membership.findMany({ where: w, include: memberInclude, orderBy: orderBy(sort.field, sort.dir), ...page }),
+      () => tx.membership.count({ where: w }),
+    );
     return { items, total };
   }
 

@@ -10,6 +10,7 @@ import OrganizationRepository from '../../../repository/organization.repository.
 import { AppError } from '../../../utils/AppError.js';
 import { menuItemToApi, categoryToApi } from '../../menu/shared/menu.mapper.js';
 import { isAvailableForOrder, tableToApi } from '../../table/shared/table.mapper.js';
+import { inOrder } from '../../../utils/Helpers.js';
 
 export type TableLocator =
   | { kind: 'qrToken'; value: string }
@@ -49,11 +50,11 @@ class PublicOrderingService {
     const { id, orgId } = await locate(loc);
 
     return withTenant({ orgId }, async (tx) => {
-      const [table, org, categories] = await Promise.all([
-        DiningTableRepository.findById(tx, id),
-        OrganizationRepository.findCurrent(tx, orgId),
-        MenuItemRepository.orderableMenu(tx),
-      ]);
+      const [table, org, categories] = await inOrder(
+        () => DiningTableRepository.findById(tx, id),
+        () => OrganizationRepository.findCurrent(tx, orgId),
+        () => MenuItemRepository.orderableMenu(tx),
+      );
       if (!table || !org || org.status === 'suspended') throw notFound();
 
       const { assignedWaiter, ...publicTable } = tableToApi(table);

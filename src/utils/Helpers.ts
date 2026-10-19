@@ -28,3 +28,16 @@ export function paginationMeta(page: number, limit: number, totalItems: number) 
     prevPage: page > 1 ? page - 1 : null,
   };
 }
+
+/**
+ * Run async steps one after another and return their results as a tuple.
+ * Use this instead of Promise.all inside a transaction: a transaction is a
+ * single connection, so parallel queries only queue (and pg@9 rejects them).
+ */
+export async function inOrder<T extends readonly (() => Promise<unknown>)[]>(
+  ...steps: T
+): Promise<{ -readonly [K in keyof T]: Awaited<ReturnType<T[K]>> }> {
+  const results: unknown[] = [];
+  for (const step of steps) results.push(await step());
+  return results as { -readonly [K in keyof T]: Awaited<ReturnType<T[K]>> };
+}

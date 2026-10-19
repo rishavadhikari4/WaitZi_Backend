@@ -2,6 +2,7 @@
 import type { MenuAvailability, Prisma } from '@prisma/client';
 
 import type { TenantTx } from '../config/prisma.js';
+import { inOrder } from '../utils/Helpers.js';
 
 export const menuItemInclude = {
   category: { select: { id: true, name: true, description: true, image: true } },
@@ -40,10 +41,10 @@ class MenuItemRepository {
         },
       }),
     };
-    const [items, total] = await Promise.all([
-      tx.menuItem.findMany({ where, include: menuItemInclude, orderBy, ...page }),
-      tx.menuItem.count({ where }),
-    ]);
+    const [items, total] = await inOrder(
+      () => tx.menuItem.findMany({ where, include: menuItemInclude, orderBy, ...page }),
+      () => tx.menuItem.count({ where }),
+    );
     return { items, total };
   }
 

@@ -23,6 +23,8 @@ export default {
     env: nodeEnv,
     isProduction: nodeEnv === 'production',
     port: envNumber('PORT', 8080),
+    /** Public URL of this API (payment gateways redirect back to it). */
+    apiUrl: env('API_URL', 'http://localhost:8080').replace(/\/+$/, ''),
     frontendUrl: env('FRONTEND_URL', 'http://localhost:3000').split(',')[0]!.trim(),
     corsOrigins: list(env('FRONTEND_URL', 'http://localhost:3000')),
     trustProxy: envNumber('TRUST_PROXY', 1),
@@ -40,6 +42,15 @@ export default {
     refreshSecret: env('REFRESH_TOKEN_SECRET'),
     accessExpiry: env('ACCESS_TOKEN_EXPIRY', '15m'),
     refreshExpiry: env('REFRESH_TOKEN_EXPIRY', '7d'),
+  },
+  orders: {
+    // ponytail: per-server settings; move into organization settings when a
+    // restaurant needs its own values.
+    /** Max Pending + InKitchen orders per branch before new ones are refused. */
+    kitchenCapacity: envNumber('KITCHEN_CAPACITY', 10),
+    /** Pending orders not accepted by the kitchen within this are auto-cancelled. */
+    timeoutMinutes: envNumber('ORDER_TIMEOUT_MINUTES', 30),
+    duplicateWindowMinutes: 5,
   },
   smtp: {
     host: env('SMTP_HOST'),

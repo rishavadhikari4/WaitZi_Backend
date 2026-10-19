@@ -5,14 +5,16 @@ import type { AddressInfo } from 'node:net';
 import http from 'node:http';
 
 import app from '../../src/app.js';
+import SocketService from '../../src/services/socket/socket.service.js';
 
 export interface ApiResult<T = any> {
   status: number;
   body: T;
 }
 
-export async function startServer() {
+export async function startServer({ sockets = false }: { sockets?: boolean } = {}) {
   const server = http.createServer(app);
+  if (sockets) SocketService.init(server);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
   const base = `http://127.0.0.1:${port}/api`;
@@ -37,6 +39,10 @@ export async function startServer() {
     put: <T = any>(path: string, body?: unknown, token?: string) => call<T>('PUT', path, { body, ...(token && { token }) }),
     patch: <T = any>(path: string, body?: unknown, token?: string) => call<T>('PATCH', path, { body, ...(token && { token }) }),
     del: <T = any>(path: string, token?: string) => call<T>('DELETE', path, { ...(token && { token }) }),
-    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+    port,
+    close: async () => {
+      if (sockets) await SocketService.close();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    },
   };
 }

@@ -12,6 +12,9 @@ export default defineConfig({
       NODE_ENV: 'test',
       ACCESS_TOKEN_SECRET: 'test-access-secret',
       REFRESH_TOKEN_SECRET: 'test-refresh-secret',
+      // Khalti is mocked in tests; this org is the one allowed to use it.
+      KHALTI_SECRET_KEY: 'test-khalti-key',
+      DEFAULT_ORG_SLUG: 'pay-a',
       DATABASE_URL: toTestDb(process.env['DATABASE_URL']),
       DATABASE_PLATFORM_URL: toTestDb(process.env['DATABASE_PLATFORM_URL']),
       DATABASE_ADMIN_URL: toTestDb(process.env['DATABASE_ADMIN_URL']),

@@ -10,6 +10,7 @@ import { AppError } from '../../utils/AppError.js';
 import ApiResponse from '../../utils/ApiResponse.js';
 import { logger } from '../../utils/logger.js';
 import { extractAccessToken, isNearExpiry, verifyAccessToken } from '../../utils/tokens.js';
+import { inOrder } from '../../utils/Helpers.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -26,10 +27,10 @@ async function resolveCaller(req: Request, res: Response): Promise<void> {
 
   const orgId = decoded.orgId;
   const loaded = await withTenant({ orgId, userId: decoded.userId }, async (tx) => {
-    const [member, org] = await Promise.all([
-      UserOrganizationRepository.findMember(tx, orgId, decoded.userId),
-      OrganizationRepository.findCurrent(tx, orgId),
-    ]);
+    const [member, org] = await inOrder(
+      () => UserOrganizationRepository.findMember(tx, orgId, decoded.userId),
+      () => OrganizationRepository.findCurrent(tx, orgId),
+    );
     return { member, org };
   });
 
