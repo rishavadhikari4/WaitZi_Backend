@@ -1,0 +1,15 @@
+import 'dotenv/config';
+import { defineConfig, env } from 'prisma/config';
+
+// Migrations run as the database owner; the app itself connects as the
+// least-privilege waitzi_app role (DATABASE_URL), see db/client.js.
+export default defineConfig({
+  schema: 'prisma/schema.prisma',
+  migrations: {
+    path: 'prisma/migrations',
+    seed: 'node prisma/seed.js',
+  },
+  datasource: {
+    url: env('DATABASE_ADMIN_URL'),
+  },
+});

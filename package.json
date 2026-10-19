@@ -5,12 +5,18 @@
   "description": "This is the backend For a digial waiter and restaurant management system",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
     "start": "node server.js",
     "dev": "nodemon server.js",
     "debug-auth": "node debug-auth.js",
     "seed-admin": "node seed-admin.js",
-    "seed-data": "node seed-data.js"
+    "seed-data": "node seed-data.js",
+    "postinstall": "prisma generate",
+    "db:up": "docker compose up -d db",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:new": "prisma migrate dev --create-only",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio"
   },
   "repository": {
     "type": "git",
@@ -23,6 +29,8 @@
   },
   "homepage": "https://github.com/rishavadhikari4/WaitZi_Backend#readme",
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.8.0",
@@ -36,10 +44,13 @@
     "mongoose": "^8.19.3",
     "multer": "^2.0.2",
     "nodemailer": "^9.0.3",
+    "pg": "^8.23.1",
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "nodemon": "^3.1.11",
+    "prisma": "^7.10.0",
+    "vitest": "^3.2.7"
   }
 }
