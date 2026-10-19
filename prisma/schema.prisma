@@ -312,7 +312,10 @@ model DiningTable {
   capacity         Int
   status           TableStatus @default(Available)
   /// Unguessable token printed in the table QR (replaces /table/:number).
-  qrToken          String      @unique @default(dbgenerated("encode(gen_random_bytes(16), 'hex')")) @map("qr_token")
+  qrToken          String      @unique @default(dbgenerated("encode(gen_random_bytes(16), 'hex'::text)")) @map("qr_token")
+  /// MongoDB _id from before the Postgres move: QR stickers already printed
+  /// encode it, so public lookups still accept it. Null for new tables.
+  legacyId         String?     @unique @map("legacy_id")
   currentOrderId   String?     @unique @map("current_order_id") @db.Uuid
   assignedWaiterId String?     @map("assigned_waiter_id") @db.Uuid
   createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz
@@ -341,7 +344,7 @@ model Order {
   finalPaisa       Int         @default(0) @map("final_paisa")
   status           OrderStatus @default(Pending)
   assignedWaiterId String?     @map("assigned_waiter_id") @db.Uuid
-  orderTimeout     DateTime    @default(dbgenerated("(now() + interval '30 minutes')")) @map("order_timeout") @db.Timestamptz
+  orderTimeout     DateTime    @default(dbgenerated("(now() + '00:30:00'::interval)")) @map("order_timeout") @db.Timestamptz
   isTimedOut       Boolean     @default(false) @map("is_timed_out")
   isPrepaid        Boolean     @default(false) @map("is_prepaid")
   note             String?

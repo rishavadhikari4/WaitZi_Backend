@@ -3,7 +3,9 @@
 // req.tenant is set and services scope all data through withTenant().
 import { Router } from 'express';
 
+import { categoryRoutes, menuRoutes } from './component/menuRoute/client/menu.routes.js';
 import roleRoutes from './component/roleRoute/client/role.routes.js';
+import tableRoutes from './component/tableRoute/client/table.routes.js';
 import userRoutes from './component/userRoute/client/user.routes.js';
 
 const clientRouter = Router();
@@ -12,6 +14,13 @@ const clientRouter = Router();
 clientRouter.use('/users', userRoutes);
 clientRouter.use('/roles', roleRoutes);
 
-// Ported next (Stage 1): categories, menu, tables, QR, orders, payments, dashboard.
+// ── Menu ──────────────────────────────────────────────────────────────────────
+clientRouter.use('/categories', categoryRoutes);
+clientRouter.use('/menu', menuRoutes);
+
+// ── Floor: tables and their QR codes ─────────────────────────────────────────
+clientRouter.use('/tables', tableRoutes);
+
+// Ported next (Stage 1): orders, payments, dashboard.
 
 export default clientRouter;

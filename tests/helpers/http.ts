@@ -31,6 +31,7 @@ export async function startServer() {
   }
 
   return {
+    baseUrl: base,
     get: <T = any>(path: string, token?: string) => call<T>('GET', path, { ...(token && { token }) }),
     post: <T = any>(path: string, body?: unknown, token?: string) => call<T>('POST', path, { body, ...(token && { token }) }),
     put: <T = any>(path: string, body?: unknown, token?: string) => call<T>('PUT', path, { body, ...(token && { token }) }),
