@@ -6,6 +6,9 @@ import { AppError } from '../../../utils/AppError.js';
 import { paginationMeta, toPaisa, toRupees, inOrder } from '../../../utils/Helpers.js';
 import { DEFAULT_TIMEZONE, startOfDayIn } from '../../../utils/time.js';
 import type { PaymentQuery, PaymentStatusInput, ProcessPaymentInput, RefundInput } from '../../../validators/payment.schema.js';
+import type { RequestUser } from '../../../Interface/GlobalInterface.js';
+import { requireApproval } from '../../approval/approval.service.js';
+import { recordAudit } from '../../audit/audit.service.js';
 import { orderToApi } from '../../order/shared/order.mapper.js';
 import SocketService from '../../socket/socket.service.js';
 import { PAYABLE_STATUSES, paymentToApi, settleOrder } from '../shared/payment.core.js';
@@ -50,6 +53,12 @@ class ClientPaymentService {
         transactionId: input.transactionId ?? null,
       });
       if (paid) await settleOrder(tx, order.id);
+      await recordAudit(tx, tenant, {
+        action: 'payment.create',
+        targetType: 'payment',
+        targetId: created.id,
+        after: { orderId: order.id, method: created.method, amount: toRupees(amountPaisa), status: created.status },
+      });
       return created;
     });
     if (payment.status === 'Paid') await emitPaid(tenant, payment.orderId);
@@ -123,6 +132,13 @@ class ClientPaymentService {
         ...(input.transactionId !== undefined && { transactionId: input.transactionId }),
       });
       if (input.paymentStatus === 'Paid') await settleOrder(tx, p.orderId);
+      await recordAudit(tx, tenant, {
+        action: input.paymentStatus === 'Paid' ? 'payment.confirm' : 'payment.fail',
+        targetType: 'payment',
+        targetId: id,
+        before: { status: p.status },
+        after: { status: updated.status, transactionId: updated.transactionId },
+      });
       return updated;
     });
     if (payment.status === 'Paid') await emitPaid(tenant, payment.orderId);
@@ -130,8 +146,9 @@ class ClientPaymentService {
   };
 
   /** Refunds are separate negative rows; the original is marked Refunded once fully refunded. */
-  refund = (tenant: TenantContext, id: string, input: RefundInput) =>
-    withTenant(tenant, async (tx) => {
+  refund = (tenant: TenantContext, actor: RequestUser, id: string, input: RefundInput) => {
+    const approvedBy = requireApproval(tenant, actor, 'refund.approve', id, input.approvalToken);
+    return withTenant(tenant, async (tx) => {
       await tx.$queryRaw`SELECT id FROM payments WHERE id = ${id}::uuid FOR UPDATE`;
       const original = await PaymentRepository.findById(tx, id);
       if (!original) throw AppError.notFound('Payment not found');
@@ -158,6 +175,13 @@ class ClientPaymentService {
       });
       const updatedOriginal =
         refundPaisa === remaining ? await PaymentRepository.update(tx, id, { status: 'Refunded' }) : original;
+      await recordAudit(tx, tenant, {
+        action: 'payment.refund',
+        targetType: 'payment',
+        targetId: id,
+        after: { refundId: refund.id, amount: toRupees(refundPaisa), reason: input.reason ?? null },
+        ...(approvedBy && { approvedBy }),
+      });
 
       return {
         refund: paymentToApi(refund),
@@ -167,6 +191,7 @@ class ClientPaymentService {
         reason: input.reason || 'No reason provided',
       };
     });
+  };
 
   /** One day of takings, in the restaurant's timezone, net of refunds. */
   dailyReport = (tenant: TenantContext, date?: string) =>

@@ -71,7 +71,7 @@ class ClientPaymentController extends BaseController {
   refundPayment = async (req: Request, res: Response) => {
     try {
       const { id } = getValidatedParams<IdParams>(res);
-      const data = await ClientPaymentService.refund(this.tenant(req), id, req.body as RefundInput);
+      const data = await ClientPaymentService.refund(this.tenant(req), this.actor(req), id, req.body as RefundInput);
       return ApiResponse.created(res, data, 'Refund processed successfully');
     } catch (error) {
       return this.sendError(res, error, 'ClientPaymentController.refundPayment', 'Failed to process refund');

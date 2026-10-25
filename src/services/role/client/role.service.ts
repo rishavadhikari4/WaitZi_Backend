@@ -5,6 +5,7 @@ import RoleRepository from '../../../repository/role.repository.js';
 import UserOrganizationRepository from '../../../repository/userOrganization.repository.js';
 import { AppError } from '../../../utils/AppError.js';
 import type { CreateRoleInput, UpdateRoleInput } from '../../../validators/role.schema.js';
+import { recordAudit } from '../../audit/audit.service.js';
 
 class ClientRoleService {
   list = (tenant: TenantContext) => withTenant(tenant, (tx) => RoleRepository.list(tx));
@@ -17,14 +18,16 @@ class ClientRoleService {
     });
 
   create = (tenant: TenantContext, input: CreateRoleInput) =>
-    withTenant(tenant, (tx) =>
-      RoleRepository.create(tx, {
+    withTenant(tenant, async (tx) => {
+      const role = await RoleRepository.create(tx, {
         orgId: tenant.orgId,
         name: input.name,
         description: input.description || `${input.name} role`,
         permissions: input.permissions,
-      }),
-    );
+      });
+      await recordAudit(tx, tenant, { action: 'role.create', targetType: 'role', targetId: role.id, after: { name: role.name, permissions: role.permissions } });
+      return role;
+    });
 
   update = (tenant: TenantContext, id: string, input: UpdateRoleInput) =>
     withTenant(tenant, async (tx) => {
@@ -38,11 +41,19 @@ class ClientRoleService {
         throw AppError.badRequest('The admin role always has full access', 'SYSTEM_ROLE');
       }
 
-      return RoleRepository.update(tx, id, {
+      const updated = await RoleRepository.update(tx, id, {
         ...(input.name && { name: input.name }),
         ...(input.description !== undefined && { description: input.description }),
         ...(input.permissions && !role.permissions.includes(ALL) && { permissions: input.permissions }),
       });
+      await recordAudit(tx, tenant, {
+        action: 'role.update',
+        targetType: 'role',
+        targetId: id,
+        before: { name: role.name, permissions: role.permissions },
+        after: { name: updated.name, permissions: updated.permissions },
+      });
+      return updated;
     });
 
   remove = (tenant: TenantContext, id: string) =>
@@ -55,6 +66,7 @@ class ClientRoleService {
         throw AppError.badRequest(`Cannot delete role. ${inUse} user(s) are assigned to this role`, 'ROLE_IN_USE');
       }
       await RoleRepository.delete(tx, id);
+      await recordAudit(tx, tenant, { action: 'role.delete', targetType: 'role', targetId: id, before: { name: role.name, permissions: role.permissions } });
       return { deletedRole: { id: role.id, name: role.name } };
     });
 }

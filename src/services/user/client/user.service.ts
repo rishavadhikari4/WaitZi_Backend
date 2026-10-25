@@ -12,6 +12,7 @@ import { AppError } from '../../../utils/AppError.js';
 import { hashPassword, paginationMeta, verifyPassword } from '../../../utils/Helpers.js';
 import type { CreateMemberInput, MemberQuery, UpdateMemberInput, UpdateProfileInput } from '../../../validators/user.schema.js';
 import PasswordService from '../../auth/password.service.js';
+import { recordAudit } from '../../audit/audit.service.js';
 import ImageService from '../../media/image.service.js';
 import { memberToApi } from '../shared/member.mapper.js';
 
@@ -135,6 +136,7 @@ class ClientUserService {
         roleId: role.id,
         ...(input.branchIds && { branchIds: input.branchIds }),
       });
+      await recordAudit(tx, tenant, { action: 'staff.create', targetType: 'user', targetId: userId, after: { email: input.email, role: role.name } });
       return memberToApi(member);
     });
   };
@@ -166,10 +168,20 @@ class ClientUserService {
           ...(uploaded && { image: uploaded.url, imageId: uploaded.publicId }),
         });
       }
-      return UserOrganizationRepository.update(tx, member.id, {
+      const next = await UserOrganizationRepository.update(tx, member.id, {
         ...(input.role && { roleId: input.role }),
         ...(input.status && { status: input.status }),
       });
+      if (input.role || input.status || touchesIdentity) {
+        await recordAudit(tx, tenant, {
+          action: 'staff.update',
+          targetType: 'user',
+          targetId: userId,
+          before: { role: member.role.name, status: member.status },
+          after: { role: next.role.name, status: next.status, ...(touchesIdentity && { profileChanged: true }) },
+        });
+      }
+      return next;
     });
 
     if (uploaded) await ImageService.remove(current.user.imageId);
@@ -183,7 +195,9 @@ class ClientUserService {
     return withTenant(tenant, async (tx) => {
       const member = await requireMember(tx, tenant.orgId, userId);
       await assertKeepsAnAdmin(tx, member, { status });
-      return memberToApi(await UserOrganizationRepository.update(tx, member.id, { status }));
+      const updated = await UserOrganizationRepository.update(tx, member.id, { status });
+      await recordAudit(tx, tenant, { action: 'staff.status', targetType: 'user', targetId: userId, before: { status: member.status }, after: { status } });
+      return memberToApi(updated);
     });
   };
 
@@ -194,6 +208,7 @@ class ClientUserService {
       const m = await requireMember(tx, tenant.orgId, userId);
       await assertKeepsAnAdmin(tx, m, { status: 'Inactive' });
       await UserOrganizationRepository.delete(tx, m.id);
+      await recordAudit(tx, tenant, { action: 'staff.remove', targetType: 'user', targetId: userId, before: { email: m.user.email, role: m.role.name } });
       return m;
     });
 

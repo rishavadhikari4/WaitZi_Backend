@@ -33,6 +33,8 @@ export const paymentStatusSchema = z.object({
 export const refundSchema = z.object({
   refundAmount: rupees.refine((n) => n > 0, 'Invalid refund amount').optional(),
   reason: z.string().trim().max(300).optional(),
+  /** From POST /client/approvals when the cashier lacks refund.approve. */
+  approvalToken: z.string().max(2000).optional(),
 });
 
 export const dailyReportQuerySchema = z.object({

@@ -29,6 +29,8 @@ export interface IOrderFilters {
   from?: Date;
   to?: Date;
   branchIds?: string[];
+  /** Orders assigned to this waiter, or placed at a table assigned to them. */
+  waiterId?: string;
 }
 
 function where(f: IOrderFilters): Prisma.OrderWhereInput {
@@ -37,6 +39,7 @@ function where(f: IOrderFilters): Prisma.OrderWhereInput {
     ...(f.tableId && { tableId: f.tableId }),
     ...((f.from || f.to) && { createdAt: { ...(f.from && { gte: f.from }), ...(f.to && { lte: f.to }) } }),
     ...(f.branchIds?.length && { branchId: { in: f.branchIds } }),
+    ...(f.waiterId && { OR: [{ assignedWaiterId: f.waiterId }, { table: { assignedWaiterId: f.waiterId } }] }),
   };
 }
 
@@ -103,8 +106,8 @@ class OrderRepository {
     return tx.orderItem.update({ where: { id: itemId }, data });
   }
 
-  async stats(tx: TenantTx, startOfToday: Date, branchIds?: string[]) {
-    const base = where({ ...(branchIds && { branchIds }) });
+  async stats(tx: TenantTx, startOfToday: Date, scope: Pick<IOrderFilters, 'branchIds' | 'waiterId'> = {}) {
+    const base = where(scope);
     const paid: Prisma.OrderWhereInput = { ...base, status: { in: ['Paid', 'Completed'] } };
     const [total, today, byStatus, revenueToday, revenueTotal] = await inOrder(
       () => tx.order.count({ where: base }),

@@ -60,6 +60,29 @@ export function signTokenPair(payload: AccessPayload) {
   };
 }
 
+// ── Manager approvals ───────────────────────────────────────────────────────
+// A separate audience, so an approval token can never pass as an access token.
+const APPROVAL_AUDIENCE = 'waitzi-approval';
+
+export interface ApprovalPayload {
+  orgId: string;
+  approverId: string;
+  requestedBy: string;
+  permission: string;
+  targetId: string | null;
+}
+
+export const signApprovalToken = (p: ApprovalPayload) =>
+  jwt.sign(p, secret('access'), { issuer: ISSUER, audience: APPROVAL_AUDIENCE, expiresIn: '5m' });
+
+export function verifyApprovalToken(token: string): ApprovalPayload {
+  try {
+    return jwt.verify(token, secret('access'), { issuer: ISSUER, audience: APPROVAL_AUDIENCE }) as ApprovalPayload;
+  } catch {
+    throw AppError.forbidden('The manager approval is invalid or has expired; ask again', 'APPROVAL_INVALID');
+  }
+}
+
 export const verifyAccessToken = (token: string) => verify<AccessPayload & { exp: number }>(token, 'access');
 export const verifyRefreshToken = (token: string) => verify<TokenIdentity>(token, 'refresh');
 

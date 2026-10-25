@@ -9,9 +9,12 @@ import OrderRepository, { ACTIVE_STATUSES, type OrderRow } from '../../../reposi
 import PaymentRepository from '../../../repository/payment.repository.js';
 import { AppError } from '../../../utils/AppError.js';
 import { paginationMeta, toPaisa, toRupees } from '../../../utils/Helpers.js';
+import { inBranch, orderScope, type FloorScope } from '../../../utils/scope.js';
 import { DEFAULT_TIMEZONE, startOfDayIn } from '../../../utils/time.js';
 import type { OrderLineInput, OrderQuery, OrderStatusInput, StaffCreateOrderInput } from '../../../validators/order.schema.js';
 import SocketService, { type OrderEvent } from '../../socket/socket.service.js';
+import { requireApproval } from '../../approval/approval.service.js';
+import { recordAudit } from '../../audit/audit.service.js';
 import { createOrderTx, priceLines, recomputeTotals, releaseTable } from '../shared/order.core.js';
 import { orderToApi } from '../shared/order.mapper.js';
 
@@ -39,10 +42,16 @@ function assertMayMoveTo(actor: RequestUser, status: OrderStatus) {
   if (!ok) throw AppError.forbidden(`Your role cannot set orders to ${status}`, 'FORBIDDEN');
 }
 
+/** A waiter without floor.all only sees orders assigned to them or at their tables. */
+function visible(scope: FloorScope, order: OrderRow): boolean {
+  if (!inBranch(scope, order.branchId)) return false;
+  return !scope.waiterId || order.assignedWaiterId === scope.waiterId || order.table?.assignedWaiterId === scope.waiterId;
+}
+
 async function requireOrder(tx: TenantTx, id: string, actor: RequestUser): Promise<OrderRow> {
   await OrderRepository.lock(tx, id).catch(() => undefined);
   const order = await OrderRepository.findById(tx, id);
-  if (!order || (actor.branchIds.length && !actor.branchIds.includes(order.branchId))) {
+  if (!order || !visible(orderScope(actor), order)) {
     throw AppError.notFound('Order not found');
   }
   return order;
@@ -69,7 +78,8 @@ class ClientOrderService {
     }
     const order = await withTenant(tenant, async (tx) => {
       const table = await DiningTableRepository.findById(tx, input.tableId);
-      if (!table || (actor.branchIds.length && !actor.branchIds.includes(table.branchId))) {
+      const scope = orderScope(actor);
+      if (!table || !inBranch(scope, table.branchId) || (scope.waiterId && table.assignedWaiterId !== scope.waiterId)) {
         throw AppError.notFound('Table not found');
       }
       const created = await createOrderTx(tx, {
@@ -80,6 +90,22 @@ class ClientOrderService {
         note: input.note,
         ...(input.discount && { discountPaisa: toPaisa(input.discount) }),
       });
+      if (created.discountPaisa > 0) {
+        // Discounts above the org's limit (default 10% of the bill) need discount.approve.
+        const org = await tx.organization.findUniqueOrThrow({ where: { id: tenant.orgId }, select: { taxSettings: true } });
+        const limit = Number((org.taxSettings as { discountApprovalPercent?: number }).discountApprovalPercent ?? 10);
+        const approvedBy =
+          created.discountPaisa * 100 > created.totalPaisa * limit
+            ? requireApproval(tenant, actor, 'discount.approve', created.id, input.approvalToken)
+            : undefined;
+        await recordAudit(tx, tenant, {
+          action: 'order.discount',
+          targetType: 'order',
+          targetId: created.id,
+          after: { discount: toRupees(created.discountPaisa), total: toRupees(created.totalPaisa) },
+          ...(approvedBy && { approvedBy }),
+        });
+      }
       return created;
     });
     emit(tenant.orgId, 'order:new', order);
@@ -88,7 +114,8 @@ class ClientOrderService {
 
   list = (tenant: TenantContext, actor: RequestUser, q: OrderQuery) =>
     withTenant(tenant, async (tx) => {
-      const branchIds = actor.branchIds.length ? actor.branchIds : undefined;
+      const scope = orderScope(actor);
+      const branchIds = scope.branchIds.length ? scope.branchIds : undefined;
       const { items, total } = await OrderRepository.list(
         tx,
         {
@@ -97,11 +124,15 @@ class ClientOrderService {
           ...(q.startDate && { from: q.startDate }),
           ...(q.endDate && { to: q.endDate }),
           ...(branchIds && { branchIds }),
+          ...(scope.waiterId && { waiterId: scope.waiterId }),
         },
         { skip: (q.page - 1) * q.limit, take: q.limit },
         { [SORT_FIELD[q.sortBy]]: q.sortOrder },
       );
-      const s = await OrderRepository.stats(tx, startOfDayIn(DEFAULT_TIMEZONE), branchIds);
+      const s = await OrderRepository.stats(tx, startOfDayIn(DEFAULT_TIMEZONE), {
+        ...(branchIds && { branchIds }),
+        ...(scope.waiterId && { waiterId: scope.waiterId }),
+      });
       return {
         orders: items.map(orderToApi),
         pagination: paginationMeta(q.page, q.limit, total),
@@ -125,6 +156,7 @@ class ClientOrderService {
           tableId,
           ...(status ? { status } : { statuses: ACTIVE_STATUSES }),
           ...(actor.branchIds.length && { branchIds: actor.branchIds }),
+          ...(orderScope(actor).waiterId && { waiterId: actor.id }),
         },
         { createdAt: 'desc' },
       );
@@ -231,6 +263,13 @@ class ClientOrderService {
         note: current.note ? `${current.note}\n${line}` : line,
       });
       await releaseTable(tx, updated);
+      await recordAudit(tx, tenant, {
+        action: 'order.cancel',
+        targetType: 'order',
+        targetId: id,
+        before: { status: current.status, total: toRupees(current.finalPaisa) },
+        after: { reason: reason ?? null },
+      });
       return updated;
     });
     emit(tenant.orgId, 'order:cancelled', order);

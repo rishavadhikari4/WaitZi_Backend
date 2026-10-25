@@ -18,6 +18,8 @@ export interface TenantContext {
   orgId: string;
   userId?: string | undefined;
   branchId?: string | undefined;
+  /** Request IP, recorded in the audit log. */
+  ip?: string | undefined;
 }
 
 function makeClient(url: string | undefined, name: string): PrismaClient {

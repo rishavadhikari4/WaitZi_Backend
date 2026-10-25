@@ -31,6 +31,8 @@ export const staffCreateOrderSchema = z.object({
   items: lines,
   note,
   discount: rupees.optional(),
+  /** Needed when the discount is above the org's limit and the actor lacks discount.approve. */
+  approvalToken: z.string().max(2000).optional(),
 });
 
 export const orderQuerySchema = z.object({

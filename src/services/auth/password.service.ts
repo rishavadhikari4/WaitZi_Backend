@@ -9,6 +9,7 @@ import { AppError } from '../../utils/AppError.js';
 import { hashPassword, verifyPassword } from '../../utils/Helpers.js';
 import { logger } from '../../utils/logger.js';
 import EmailService from '../email/email.service.js';
+import { recordAudit } from '../audit/audit.service.js';
 
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
 const sha256 = (v: string) => crypto.createHash('sha256').update(v).digest('hex');
@@ -97,11 +98,13 @@ class PasswordService {
     const user = await withTenant(tenant, async (tx) => {
       const member = await UserOrganizationRepository.findMember(tx, tenant.orgId, memberUserId);
       if (!member) throw AppError.notFound('User not found');
-      return UserRepository.update(tx, memberUserId, {
+      const updated = await UserRepository.update(tx, memberUserId, {
         passwordHash: await hashPassword(tempPassword),
         passwordChangedAt: new Date(),
         mustChangePassword: true,
       });
+      await recordAudit(tx, tenant, { action: 'staff.password_reset', targetType: 'user', targetId: memberUserId });
+      return updated;
     });
     return { temporaryPassword: tempPassword, email: user.email, mustChangePassword: true };
   };

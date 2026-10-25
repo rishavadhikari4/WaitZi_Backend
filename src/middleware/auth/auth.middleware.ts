@@ -52,7 +52,7 @@ async function resolveCaller(req: Request, res: Response): Promise<void> {
     branchIds: member.branchIds,
   };
   req.organization = { id: org.id, name: org.name, slug: org.slug };
-  req.tenant = { orgId, userId: member.userId };
+  req.tenant = { orgId, userId: member.userId, ip: req.ip };
 
   if (isNearExpiry(decoded.exp)) res.set('X-Token-Warning', 'Token expires soon');
 }

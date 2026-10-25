@@ -43,8 +43,8 @@ class DiningTableRepository {
     return { items, total };
   }
 
-  async stats(tx: TenantTx, branchIds?: string[]) {
-    const where = this.where({ ...(branchIds && { branchIds }) });
+  async stats(tx: TenantTx, filters: Pick<ITableFilters, 'branchIds' | 'assignedWaiterId'> = {}) {
+    const where = this.where(filters);
     const [byStatus, totals] = await inOrder(
       () => tx.diningTable.groupBy({ by: ['status'], where, _count: { _all: true } }),
       () => tx.diningTable.aggregate({ where, _count: { _all: true }, _sum: { capacity: true } }),

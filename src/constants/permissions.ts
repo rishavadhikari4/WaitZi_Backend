@@ -22,6 +22,7 @@ export const PERMISSIONS = {
   'table.view': 'View tables',
   'table.manage': 'Create and edit tables and QR codes',
   'table.transfer': 'Transfer and merge tables',
+  'floor.all': 'See every table and its orders (otherwise only tables assigned to you)',
   // Orders and kitchen
   'order.view': 'View orders',
   'order.create': 'Create orders',
@@ -60,15 +61,14 @@ export interface RoleTemplate {
 }
 
 export const ROLE_TEMPLATES: RoleTemplate[] = [
-  // Named 'admin' so the current frontend's role checks keep working until
-  // Stage 2 moves the UI to permission checks.
+  // The UI checks permissions, never this name; '*' is what grants full access.
   { name: 'admin', description: 'Owner / organization admin, full access to the organization', permissions: [ALL] },
   {
     name: 'manager',
     description: 'Runs the floor: menu, tables, staff, approvals and reports',
     permissions: [
       'staff.view', 'staff.manage', 'menu.view', 'menu.manage', 'menu.86',
-      'table.view', 'table.manage', 'table.transfer',
+      'table.view', 'table.manage', 'table.transfer', 'floor.all',
       'order.view', 'order.create', 'order.edit', 'order.serve', 'order.cancel', 'kot.view', 'kot.update',
       'payment.view', 'payment.create', 'payment.qr', 'payment.refund', 'refund.approve', 'void.approve',
       'discount.apply', 'discount.approve', 'drawer.manage', 'invoice.print', 'report.view',
@@ -79,7 +79,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
     name: 'cashier',
     description: 'Settles bills, takes payments and runs the cash drawer',
     permissions: [
-      'menu.view', 'table.view', 'order.view', 'payment.view', 'payment.create', 'payment.qr',
+      'menu.view', 'table.view', 'floor.all', 'order.view', 'payment.view', 'payment.create', 'payment.qr',
       'payment.refund', 'discount.apply', 'drawer.manage', 'invoice.print',
     ],
   },

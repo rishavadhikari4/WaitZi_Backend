@@ -3,16 +3,17 @@ import { withTenant, type TenantContext, type TenantTx } from '../../../config/p
 import DiningTableRepository, { type TableRow } from '../../../repository/diningTable.repository.js';
 import { AppError } from '../../../utils/AppError.js';
 import { paginationMeta } from '../../../utils/Helpers.js';
+import { inBranch, type FloorScope } from '../../../utils/scope.js';
 import type { CreateTableInput, TableQuery, UpdateTableInput } from '../../../validators/table.schema.js';
 import { resolveBranchId } from '../../branch/branch.resolver.js';
 import { tableToApi } from '../shared/table.mapper.js';
 
 type TableStatus = 'Available' | 'Occupied' | 'Reserved';
 
-/** Staff tied to specific branches only see those branches' tables (404 otherwise). */
-async function requireTable(tx: TenantTx, id: string, memberBranchIds: string[]): Promise<TableRow> {
+/** Tables outside the actor's branches, or not assigned to them without floor.all, are 404. */
+async function requireTable(tx: TenantTx, id: string, scope: FloorScope): Promise<TableRow> {
   const table = await DiningTableRepository.findById(tx, id);
-  if (!table || (memberBranchIds.length && !memberBranchIds.includes(table.branchId))) {
+  if (!table || !inBranch(scope, table.branchId) || (scope.waiterId && table.assignedWaiterId !== scope.waiterId)) {
     throw AppError.notFound('Table not found');
   }
   return table;
@@ -23,24 +24,25 @@ const waiterUpdate = (w: string | null | undefined) =>
   w === undefined ? {} : { assignedWaiterId: w === '' || w === null ? null : w };
 
 class ClientTableService {
-  list = (tenant: TenantContext, q: TableQuery, memberBranchIds: string[]) =>
+  list = (tenant: TenantContext, q: TableQuery, scope: FloorScope) =>
     withTenant(tenant, async (tx) => {
-      if (q.branch && memberBranchIds.length && !memberBranchIds.includes(q.branch)) {
+      if (q.branch && !inBranch(scope, q.branch)) {
         throw AppError.forbidden('You do not work at that branch', 'BRANCH_FORBIDDEN');
       }
-      const branchIds = q.branch ? [q.branch] : memberBranchIds;
+      const branchIds = q.branch ? [q.branch] : scope.branchIds;
       const { items, total } = await DiningTableRepository.list(
         tx,
         {
           ...(q.status && { status: q.status }),
           ...(q.capacity !== undefined && { capacity: q.capacity }),
           ...(q.assignedWaiter && { assignedWaiterId: q.assignedWaiter }),
+          ...(scope.waiterId && { assignedWaiterId: scope.waiterId }),
           ...(branchIds.length && { branchIds }),
         },
         { skip: (q.page - 1) * q.limit, take: q.limit },
         { [q.sortBy]: q.sortOrder },
       );
-      const s = await DiningTableRepository.stats(tx, branchIds.length ? branchIds : undefined);
+      const s = await DiningTableRepository.stats(tx, { ...(branchIds.length && { branchIds }), ...(scope.waiterId && { assignedWaiterId: scope.waiterId }) });
       const count = (status: TableStatus) => s.byStatus.find((r) => r.status === status)?._count._all ?? 0;
       return {
         tables: items.map(tableToApi),
@@ -55,12 +57,12 @@ class ClientTableService {
       };
     });
 
-  get = (tenant: TenantContext, id: string, memberBranchIds: string[]) =>
-    withTenant(tenant, async (tx) => tableToApi(await requireTable(tx, id, memberBranchIds)));
+  get = (tenant: TenantContext, id: string, scope: FloorScope) =>
+    withTenant(tenant, async (tx) => tableToApi(await requireTable(tx, id, scope)));
 
-  create = (tenant: TenantContext, input: CreateTableInput, memberBranchIds: string[]) =>
+  create = (tenant: TenantContext, input: CreateTableInput, scope: FloorScope) =>
     withTenant(tenant, async (tx) => {
-      const branchId = await resolveBranchId(tx, input.branchId, memberBranchIds);
+      const branchId = await resolveBranchId(tx, input.branchId, scope.branchIds);
       if (await DiningTableRepository.findByNumber(tx, branchId, input.tableNumber)) {
         throw AppError.conflict(`Table ${input.tableNumber} already exists`, 'TABLE_NUMBER_TAKEN');
       }
@@ -74,9 +76,9 @@ class ClientTableService {
       return tableToApi(table);
     });
 
-  update = (tenant: TenantContext, id: string, input: UpdateTableInput, memberBranchIds: string[]) =>
+  update = (tenant: TenantContext, id: string, input: UpdateTableInput, scope: FloorScope) =>
     withTenant(tenant, async (tx) => {
-      const table = await requireTable(tx, id, memberBranchIds);
+      const table = await requireTable(tx, id, scope);
       if (input.tableNumber !== undefined && input.tableNumber !== table.tableNumber) {
         if (await DiningTableRepository.findByNumber(tx, table.branchId, input.tableNumber)) {
           throw AppError.conflict(`Table ${input.tableNumber} already exists`, 'TABLE_NUMBER_TAKEN');
@@ -91,22 +93,22 @@ class ClientTableService {
       return tableToApi(updated);
     });
 
-  updateStatus = (tenant: TenantContext, id: string, status: TableStatus, memberBranchIds: string[]) =>
+  updateStatus = (tenant: TenantContext, id: string, status: TableStatus, scope: FloorScope) =>
     withTenant(tenant, async (tx) => {
-      await requireTable(tx, id, memberBranchIds);
+      await requireTable(tx, id, scope);
       return tableToApi(await DiningTableRepository.update(tx, id, { status }));
     });
 
   /** Frees the table for the next guests. */
-  clear = (tenant: TenantContext, id: string, memberBranchIds: string[]) =>
+  clear = (tenant: TenantContext, id: string, scope: FloorScope) =>
     withTenant(tenant, async (tx) => {
-      await requireTable(tx, id, memberBranchIds);
+      await requireTable(tx, id, scope);
       return tableToApi(await DiningTableRepository.update(tx, id, { currentOrderId: null, status: 'Available' }));
     });
 
-  remove = (tenant: TenantContext, id: string, memberBranchIds: string[]) =>
+  remove = (tenant: TenantContext, id: string, scope: FloorScope) =>
     withTenant(tenant, async (tx) => {
-      const table = await requireTable(tx, id, memberBranchIds);
+      const table = await requireTable(tx, id, scope);
       if (table.currentOrderId) throw AppError.badRequest('Cannot delete table with active order', 'TABLE_IN_USE');
       const history = await DiningTableRepository.orderStats(tx, id);
       if (history._count._all > 0) {

@@ -3,6 +3,8 @@
 // req.tenant is set and services scope all data through withTenant().
 import { Router } from 'express';
 
+import approvalRoutes from './component/approvalRoute/client/approval.routes.js';
+import auditRoutes from './component/auditRoute/client/audit.routes.js';
 import dashboardRoutes from './component/dashboardRoute/client/dashboard.routes.js';
 import { categoryRoutes, menuRoutes } from './component/menuRoute/client/menu.routes.js';
 import orderRoutes from './component/orderRoute/client/order.routes.js';
@@ -32,5 +34,9 @@ clientRouter.use('/payments', paymentRoutes);
 
 // ── Dashboard and analytics ──────────────────────────────────────────────────
 clientRouter.use('/dashboard', dashboardRoutes);
+
+// ── Manager approvals and the audit log ─────────────────────────────────────
+clientRouter.use('/approvals', approvalRoutes);
+clientRouter.use('/audit', auditRoutes);
 
 export default clientRouter;

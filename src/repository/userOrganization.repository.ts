@@ -49,6 +49,14 @@ class UserOrganizationRepository {
     return tx.membership.findUnique({ where: { orgId_userId: { orgId, userId } }, include: memberInclude });
   }
 
+  findMemberByEmail(tx: TenantTx, email: string) {
+    return tx.membership.findFirst({ where: { user: { email: email.toLowerCase().trim() } }, include: memberInclude });
+  }
+
+  setPin(tx: TenantTx, id: string, pinHash: string) {
+    return tx.membership.update({ where: { id }, data: { pinHash } });
+  }
+
   async list(
     tx: TenantTx,
     filters: IMemberFilters,

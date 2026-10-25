@@ -36,7 +36,8 @@ router.patch(
 router.post(
   '/:id/refund',
   paymentLimiter,
-  requirePermission('refund.approve'),
+  // Requesting needs payment.refund; doing it also needs refund.approve or a manager's approval token.
+  requirePermission('payment.refund'),
   validateParams(idParamsSchema),
   validateBody(refundSchema),
   paymentController.refundPayment,
